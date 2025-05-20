@@ -4,10 +4,13 @@ set -euo pipefail
 # Parse arguments
 COMMAND="${1:-asciinema play /home/gaz/Videos/asciinema/faster.cast}"
 OUT="${2:-output.mp4}"
-COLS="${3:-136}"  # Default to 136 columns
-LINES="${4:-41}"  # Default to 41 lines
+COLS="${3:-$(tput cols)}"  # Use current terminal width if not specified
+LINES="${4:-$(tput lines)}"  # Use current terminal height if not specified
 FPS="${5:-30}"    # Default to 30 fps
 FONT="${6:-DejaVu Sans Mono}"  # Default font
+
+# Print terminal dimensions for debugging
+echo "Terminal dimensions: $COLS columns x $LINES lines"
 
 # Calculate window dimensions based on font size (font size 6)
 # From measurement: width=5px, height=10px
@@ -15,6 +18,13 @@ CHAR_WIDTH=5
 CHAR_HEIGHT=10
 W=$(echo "$COLS * $CHAR_WIDTH" | bc | cut -d. -f1)
 H=$(echo "$LINES * $CHAR_HEIGHT" | bc | cut -d. -f1)
+
+# Ensure dimensions are even (required for h264 encoding)
+W=$((W + (W % 2)))  # Add 1 if odd
+H=$((H + (H % 2)))  # Add 1 if odd
+
+# Print calculated dimensions
+echo "Calculated window size: ${W}x${H} pixels (adjusted to be even)"
 
 SCRIPT_PATH="$(realpath ./run.sh)"
 LAUNCH_SCRIPT="./_launch.sh"  # Renamed to _launch.sh
@@ -59,6 +69,9 @@ export H="$H"
 export OUT="$OUT"
 EOF
 chmod +x "$TMPDIR/env.sh"
+
+# Print actual values being passed to _launch.sh
+echo "Passing to _launch.sh: W=$W, H=$H, COLS=$COLS, LINES=$LINES, FPS=$FPS, FONT=$FONT"
 
 env -i \
   HOME="$FAKE_HOME" \

@@ -12,16 +12,16 @@ locale -a | grep -qi 'en_US.utf8' || {
   exit 1
 }
 
-# Required env
+# Required env - no defaults for critical dimensions
 : "${DISPLAY:=:99}"
 : "${W:?}"               # e.g. 1280
 : "${H:?}"               # e.g. 720
 : "${OUT:?}"             # e.g. output.mp4
 : "${SCRIPT_PATH:?}"     # e.g. ./run.sh
-: "${FPS:=30}"           # Default to 30 fps
-: "${COLS:=136}"         # Default to 136 columns
-: "${LINES:=41}"         # Default to 41 lines
-: "${FONT:=monospace}"   # Default font
+: "${FPS:?}"             # No default, must be passed from caller
+: "${COLS:?}"            # No default, must be passed from caller
+: "${LINES:?}"           # No default, must be passed from caller
+: "${FONT:?}"            # No default, must be passed from caller
 
 # Start virtual X server
 Xvfb "$DISPLAY" -screen 0 "${W}x${H}x24" +extension RANDR &
