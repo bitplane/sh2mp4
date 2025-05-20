@@ -40,12 +40,21 @@ chmod 700 "$FAKE_HOME" "$RUNTIME_DIR"
 
 cleanup() {
   echo "Cleaning up..."
+  # Kill the stdin pipe process if it's running
+  if [ -n "${PIPE_PID:-}" ]; then
+    kill "$PIPE_PID" 2>/dev/null || true
+  fi
   pkill -f "Xvfb :99" 2>/dev/null || true
   rm -rf "$TMPDIR"
 }
 trap cleanup EXIT INT TERM
 
-# Write the command to a temporary script
+# Create a named pipe (FIFO) for stdin
+FIFO="$TMPDIR/stdin.fifo"
+mkfifo "$FIFO"
+chmod 600 "$FIFO"
+
+# Write the command to a temporary script that reads from the FIFO
 cat > "$TMPDIR/command.sh" << EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -53,10 +62,21 @@ set -euo pipefail
 # Source the environment variables
 source "$TMPDIR/env.sh"
 
-# Execute the actual command
-$COMMAND
+# Execute the actual command, reading from the FIFO
+$COMMAND < "$FIFO"
 EOF
 chmod +x "$TMPDIR/command.sh"
+
+# Set up background process to pipe stdin to the FIFO
+# Use stdbuf to disable buffering if available
+if command -v stdbuf >/dev/null 2>&1; then
+  echo "Using stdbuf for unbuffered pipe"
+  stdbuf -i0 -o0 -e0 cat <&0 > "$FIFO" &
+else
+  echo "stdbuf not available, using regular cat"
+  cat <&0 > "$FIFO" &
+fi
+PIPE_PID=$!
 
 # Create environment file to pass variables to command script
 cat > "$TMPDIR/env.sh" << EOF
