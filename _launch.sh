@@ -12,6 +12,10 @@ locale -a | grep -qi 'en_US.utf8' || {
   exit 1
 }
 
+# Load theme settings
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+source "${SCRIPT_DIR}/themes.sh"
+
 # Required env - no defaults for critical dimensions
 : "${DISPLAY:=:99}"
 : "${W:?}"               # e.g. 1280
@@ -66,24 +70,36 @@ cleanup() {
   if [ -n "${UNCLUTTER_PID:-}" ]; then
     kill "$UNCLUTTER_PID" 2>/dev/null || true
   fi
-  # Kill ffmpeg if it was started
-  if [ -n "${FFMPEG_PID:-}" ]; then
-    kill "$FFMPEG_PID" 2>/dev/null || true
-  fi
   kill "$TERM_PID" "$WM_PID" "$XVFB_PID" 2>/dev/null || true
   wait "$XVFB_PID" 2>/dev/null || true
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT INT TERM HUP
 
 # Launch xterm with proper font, UTF-8, and box-drawing - no titlebar/decorations
 DISPLAY=$DISPLAY xterm \
   -fa "$FONT" -fs 6 \
-  -bg black -fg white \
+  -bg "${TERM_BG}" -fg "${TERM_FG}" \
+  -xrm "XTerm*color0: ${TERM_COLOR0}" \
+  -xrm "XTerm*color1: ${TERM_COLOR1}" \
+  -xrm "XTerm*color2: ${TERM_COLOR2}" \
+  -xrm "XTerm*color3: ${TERM_COLOR3}" \
+  -xrm "XTerm*color4: ${TERM_COLOR4}" \
+  -xrm "XTerm*color5: ${TERM_COLOR5}" \
+  -xrm "XTerm*color6: ${TERM_COLOR6}" \
+  -xrm "XTerm*color7: ${TERM_COLOR7}" \
+  -xrm "XTerm*color8: ${TERM_COLOR8}" \
+  -xrm "XTerm*color9: ${TERM_COLOR9}" \
+  -xrm "XTerm*color10: ${TERM_COLOR10}" \
+  -xrm "XTerm*color11: ${TERM_COLOR11}" \
+  -xrm "XTerm*color12: ${TERM_COLOR12}" \
+  -xrm "XTerm*color13: ${TERM_COLOR13}" \
+  -xrm "XTerm*color14: ${TERM_COLOR14}" \
+  -xrm "XTerm*color15: ${TERM_COLOR15}" \
   -geometry "${COLS}x${LINES}" \
   -T "no_title" \
   +sb \
   -b 0 \
-  -bd black \
+  -bd "${TERM_BG}" \
   -bw 0 \
   +maximized \
   -e "$SCRIPT_PATH" &
@@ -116,17 +132,6 @@ for i in {1..50}; do
   sleep 0.1
 done
 
-# Start recording in the background
+# Record the screen to output file
 ffmpeg -y -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -i "$DISPLAY" \
-  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT" &
-FFMPEG_PID=$!
-
-# Wait for the terminal process to finish
-wait "$TERM_PID" || true
-echo "Command completed, stopping recording..."
-
-# Stop ffmpeg after command completes
-if [ -n "${FFMPEG_PID:-}" ]; then
-  kill "$FFMPEG_PID" 2>/dev/null || true
-  wait "$FFMPEG_PID" 2>/dev/null || true
-fi
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT"

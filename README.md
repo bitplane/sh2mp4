@@ -3,7 +3,7 @@
 Records a shell script to mp4.
 
 ```bash
-$ ./sh2mp4.sh "command to run" [output.mp4] [cols] [lines] [fps] [font]
+$ ./sh2mp4.sh "command to run" [output.mp4] [cols] [lines] [fps] [font] [theme]
 ```
 
 I set up a stdbuf fifo so you should be able to pipe stuff like keypresses
@@ -20,12 +20,24 @@ either. Might be useful though.
 | lines   | `$(tput rows)`   | Terminal height in characters         |
 | fps     | 30               | Frames per second for recording       |
 | font    | DejaVu Sans Mono | Font to use (must be monospace)       |
+| theme   | sh2mp4           | Terminal color theme                  |
 
 ## Fonts
 
 Font size is fixed at 6pt, which is 5x10 pixels per character in most
 monospaced fonts. If you want to change that, run the python script to
 get dimensions and hack your changes in.
+
+## Themes
+
+Available themes:
+- `sh2mp4`: Custom theme optimized for video recording (default)
+- `tango`: Tango-based theme
+- `dark`: High-contrast dark theme
+- `light`: Light theme
+- `solarized-dark`: Solarized Dark theme
+
+You can customize or add new themes in the `themes.sh` file.
 
 ## Deps
 
