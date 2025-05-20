@@ -21,6 +21,7 @@ locale -a | grep -qi 'en_US.utf8' || {
 : "${FPS:=30}"           # Default to 30 fps
 : "${COLS:=136}"         # Default to 136 columns
 : "${LINES:=41}"         # Default to 41 lines
+: "${FONT:=monospace}"   # Default font
 
 # Start virtual X server
 Xvfb "$DISPLAY" -screen 0 "${W}x${H}x24" +extension RANDR &
@@ -47,7 +48,7 @@ trap cleanup EXIT INT TERM
 
 # Launch xterm with proper font, UTF-8, and box-drawing - no titlebar/decorations
 DISPLAY=$DISPLAY xterm \
-  -fa 'DejaVu Sans Mono' -fs 6 \
+  -fa "$FONT" -fs 6 \
   -bg black -fg white \
   -geometry "${COLS}x${LINES}" \
   -T "no_title" \

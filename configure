@@ -23,12 +23,13 @@ else
   echo "✓ Found locale: en_US.UTF-8"
 fi
 
-# Check for DejaVu Sans Mono font
-if ! fc-list | grep -q "DejaVu Sans Mono"; then
-  echo "❌ Missing font: DejaVu Sans Mono"
-  MISSING=$((MISSING + 1))
+# Check for monospace fonts - less restrictive check
+if fc-list | grep -i -E "mono|courier|console|fixed" > /dev/null; then
+  echo "✓ Found monospace font"
 else
-  echo "✓ Found font: DejaVu Sans Mono"
+  echo "❌ Missing monospace font"
+  echo "   Please install a monospace font like DejaVu Sans Mono, Liberation Mono, or Courier"
+  MISSING=$((MISSING + 1))
 fi
 
 # Summary
