@@ -66,6 +66,10 @@ cleanup() {
   if [ -n "${UNCLUTTER_PID:-}" ]; then
     kill "$UNCLUTTER_PID" 2>/dev/null || true
   fi
+  # Kill ffmpeg if it was started
+  if [ -n "${FFMPEG_PID:-}" ]; then
+    kill "$FFMPEG_PID" 2>/dev/null || true
+  fi
   kill "$TERM_PID" "$WM_PID" "$XVFB_PID" 2>/dev/null || true
   wait "$XVFB_PID" 2>/dev/null || true
 }
@@ -112,6 +116,17 @@ for i in {1..50}; do
   sleep 0.1
 done
 
-# Record the screen to output file
+# Start recording in the background
 ffmpeg -y -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -i "$DISPLAY" \
-  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT"
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT" &
+FFMPEG_PID=$!
+
+# Wait for the terminal process to finish
+wait "$TERM_PID" || true
+echo "Command completed, stopping recording..."
+
+# Stop ffmpeg after command completes
+if [ -n "${FFMPEG_PID:-}" ]; then
+  kill "$FFMPEG_PID" 2>/dev/null || true
+  wait "$FFMPEG_PID" 2>/dev/null || true
+fi
