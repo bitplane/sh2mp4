@@ -28,19 +28,44 @@ Xvfb "$DISPLAY" -screen 0 "${W}x${H}x24" +extension RANDR &
 XVFB_PID=$!
 sleep 1
 
-# Start minimal window manager
-DISPLAY=$DISPLAY openbox &
+# Start minimal window manager with no decorations configuration
+mkdir -p "$HOME/.config/openbox"
+cat > "$HOME/.config/openbox/rc.xml" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+      <maximized>yes</maximized>
+    </application>
+  </applications>
+</openbox_config>
+EOF
+
+DISPLAY=$DISPLAY openbox --config-file "$HOME/.config/openbox/rc.xml" &
 WM_PID=$!
 sleep 1
 
-# Move mouse cursor off-screen (if xdotool available)
-if command -v xdotool >/dev/null 2>&1; then
-  DISPLAY=$DISPLAY xdotool mousemove $W $H
+# Hide the mouse cursor
+# Method 1: Try using unclutter if available
+if command -v unclutter >/dev/null 2>&1; then
+  echo "Using unclutter to hide cursor"
+  DISPLAY=$DISPLAY unclutter -idle 0 -root &
+  UNCLUTTER_PID=$!
+# Method 2: Move cursor far off-screen as fallback
+elif command -v xdotool >/dev/null 2>&1; then
+  echo "Moving cursor off-screen"
+  # Move to far bottom right corner
+  DISPLAY=$DISPLAY xdotool mousemove 9999 9999
 fi
 
 # Ensure we clean up even if things crash
 cleanup() {
   echo "Cleaning up..."
+  # Kill unclutter if it was started
+  if [ -n "${UNCLUTTER_PID:-}" ]; then
+    kill "$UNCLUTTER_PID" 2>/dev/null || true
+  fi
   kill "$TERM_PID" "$WM_PID" "$XVFB_PID" 2>/dev/null || true
   wait "$XVFB_PID" 2>/dev/null || true
 }
@@ -53,6 +78,10 @@ DISPLAY=$DISPLAY xterm \
   -geometry "${COLS}x${LINES}" \
   -T "no_title" \
   +sb \
+  -b 0 \
+  -bd black \
+  -bw 0 \
+  +maximized \
   -e "$SCRIPT_PATH" &
 TERM_PID=$!
 sleep 1
@@ -61,10 +90,23 @@ sleep 1
 for i in {1..50}; do
   WID=$(DISPLAY=$DISPLAY xdotool search --onlyvisible --class xterm | head -n1 || true)
   if [ -n "$WID" ]; then
-    # Set window size
+    echo "Found xterm window ID: $WID"
+    
+    # Set window size and position (0,0 coordinates, width x height)
     DISPLAY=$DISPLAY wmctrl -ir "$WID" -e 0,0,0,"$W","$H"
-    # Remove window decorations (titlebar)
+    
+    # Apply both decoration removal methods
+    
+    # Method 1: MOTIF hints
     DISPLAY=$DISPLAY xprop -id "$WID" -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS "0x2, 0x0, 0x0, 0x0, 0x0"
+    
+    # Method 2: Openbox undecorated property
+    DISPLAY=$DISPLAY wmctrl -i -r "$WID" -b add,undecorated
+    
+    # Also make it full screen for good measure
+    DISPLAY=$DISPLAY wmctrl -i -r "$WID" -b add,fullscreen
+    
+    echo "Window configured and decorations removed."
     break
   fi
   sleep 0.1
