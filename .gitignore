@@ -1,1 +1,6 @@
+*~
+*.log
+*.tmp
 *.mp4
+*.png
+*.cast
