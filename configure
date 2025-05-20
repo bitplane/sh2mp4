@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "Checking dependencies for terminal-to-mp4..."
+
+# Check for required tools
+MISSING=0
+for cmd in xdotool wmctrl ffmpeg Xvfb openbox xterm asciinema; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "❌ Missing: $cmd"
+    MISSING=$((MISSING + 1))
+  else
+    echo "✓ Found: $cmd"
+  fi
+done
+
+# Check for locale
+if ! locale -a | grep -qi 'en_US.utf8'; then
+  echo "❌ Missing locale: en_US.UTF-8"
+  echo "   You may need to run: sudo locale-gen en_US.UTF-8"
+  MISSING=$((MISSING + 1))
+else
+  echo "✓ Found locale: en_US.UTF-8"
+fi
+
+# Check for DejaVu Sans Mono font
+if ! fc-list | grep -q "DejaVu Sans Mono"; then
+  echo "❌ Missing font: DejaVu Sans Mono"
+  MISSING=$((MISSING + 1))
+else
+  echo "✓ Found font: DejaVu Sans Mono"
+fi
+
+# Summary
+if [ $MISSING -eq 0 ]; then
+  echo -e "\n✅ All dependencies satisfied!"
+  exit 0
+else
+  echo -e "\n⚠️  Missing $MISSING dependencies."
+  echo "Please install missing dependencies before running record.sh"
+  exit 1
+fi
