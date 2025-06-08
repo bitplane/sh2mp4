@@ -59,6 +59,6 @@ Do wtf you want, but you're on your own.
 
 ### See also
 
-* [📺 tvmux](https://bitplane.net/sh/tvmux) -
+* [📺 tvmux](https://bitplane.net/dev/sh/tvmux) -
   a tmux recorder using asciinema.
 
