@@ -10,3 +10,4 @@ __pycache__
 *.png
 *.cast
 CLAUDE.md
+docs/pydoc

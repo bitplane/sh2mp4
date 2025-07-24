@@ -93,7 +93,7 @@ Do wtf you want, but you're on your own.
 
 ## Links
 
-* [🏠 home](https://bitplane.net/dev/sh/sh2mp4)
+* [🏠 home](https://bitplane.net/dev/python/sh2mp4)
 * [🐱 github](https://github.com/bitplane/sh2mp4)
 
 ### See also
