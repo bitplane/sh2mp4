@@ -19,6 +19,7 @@ class DisplayManager:
         self.display_name: Optional[str] = None
         self.xvfb_process: Optional[asyncio.subprocess.Process] = None
         self.openbox_process: Optional[asyncio.subprocess.Process] = None
+        self.unclutter_process: Optional[asyncio.subprocess.Process] = None
         self.temp_dir: Optional[Path] = None
 
     async def start(self, width: int, height: int) -> None:
@@ -44,6 +45,12 @@ class DisplayManager:
 
         # Wait for window manager to initialize
         await asyncio.sleep(1)
+
+        # Start unclutter to hide mouse cursor
+        await self._start_unclutter()
+
+        # Wait for unclutter to initialize
+        await asyncio.sleep(0.5)
 
     async def _start_xvfb(self, width: int, height: int) -> None:
         """Start the Xvfb virtual display server"""
@@ -86,8 +93,28 @@ class DisplayManager:
             *cmd, env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
         )
 
+    async def _start_unclutter(self) -> None:
+        """Start unclutter to hide the mouse cursor"""
+        cmd = ["unclutter", "-idle", "0"]
+
+        env = os.environ.copy()
+        env["DISPLAY"] = self.display_name
+
+        self.unclutter_process = await asyncio.create_subprocess_exec(
+            *cmd, env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        )
+
     async def stop(self) -> None:
         """Stop the display and clean up"""
+        # Stop unclutter
+        if self.unclutter_process:
+            try:
+                self.unclutter_process.terminate()
+                await asyncio.wait_for(self.unclutter_process.wait(), timeout=5)
+            except asyncio.TimeoutError:
+                self.unclutter_process.kill()
+                await self.unclutter_process.wait()
+
         # Stop openbox
         if self.openbox_process:
             try:
