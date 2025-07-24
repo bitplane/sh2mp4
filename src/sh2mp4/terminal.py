@@ -89,12 +89,13 @@ exit 0
             "-bw",
             "0",  # No border width
             "+maximized",
-            "-e",
-            str(script_path),
         ]
 
-        # Add theme arguments
+        # Add theme arguments before -e option (must be last)
         cmd.extend(self.theme.xterm_args)
+
+        # Add -e option last (as required by xterm)
+        cmd.extend(["-e", str(script_path)])
 
         env = os.environ.copy()
         env["DISPLAY"] = self.display_name

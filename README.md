@@ -1,14 +1,14 @@
 # 🎥 sh2mp4
 
-Records a shell script to mp4.
+Records a shell command to an MP4 video, using xterm in a hidden desktop session.
+
+This version is now written in Python. Use `uvx sh2mp4` or `pipx sh2mp4` to execute.
+
+## Usage
 
 ```bash
-$ ./sh2mp4.sh "command to run" [output.mp4] [cols] [lines] [fps] [font] [font_size] [theme]
+$ sh2mp4 "command to run" [output.mp4]
 ```
-
-I set up a stdbuf fifo so you should be able to pipe stuff like keypresses
-in, but it's untested and you won't be able to see what you're doing
-either. Might be useful though.
 
 ## Defaults
 
@@ -25,7 +25,7 @@ either. Might be useful though.
 
 ## Fonts
 
-Font size is configurable (default 12pt). Character dimensions are automatically 
+Font size is configurable (default 12pt). Character dimensions are automatically
 calculated based on the font size. Supported sizes: 4, 6, 8, 10, 12, 14, 16, 18, 20.
 Run `python3 measure_fonts.py` to see pixel dimensions for all available fonts and sizes.
 
