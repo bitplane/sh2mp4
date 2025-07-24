@@ -1,0 +1,42 @@
+[project]
+name = "sh2mp4"
+description = "Records shell commands to MP4 videos"
+version = "0.2.0"
+authors = [
+    { name = "Gareth Davidson", email = "gaz@bitplane.net" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "coverage",
+    "pytest-cov",
+    "pytest-asyncio",
+    "build",
+    "twine",
+    "ruff"
+]
+
+[project.scripts]
+sh2mp4 = "sh2mp4.__main__:main"
+cast2mp4 = "sh2mp4.cast2mp4:main"
+
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core >=3.2,<4"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
