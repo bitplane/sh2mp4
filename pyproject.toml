@@ -26,6 +26,8 @@ dev = [
 [project.scripts]
 sh2mp4 = "sh2mp4.__main__:main"
 cast2mp4 = "sh2mp4.cast2mp4:main"
+sh2mp4-peep = "sh2mp4.peep:main"
+sh2mp4-measure-fonts = "sh2mp4.measure_fonts:main"
 
 [build-system]
 build-backend = "flit_core.buildapi"
