@@ -14,6 +14,7 @@ class CastConfig(NamedTuple):
     lines: int
     command: str
     playback_speed: float = 1.0
+    recording_fps: int = 30
 
 
 def get_cast_dimensions(cast_file: Path) -> tuple[int, int]:
@@ -38,12 +39,15 @@ def get_cast_command(cast_file: Path, playback_speed: float = 1.0) -> str:
     return f'bash -c "asciinema play -i 1{speed_arg} \\"{cast_file.absolute()}\\""'
 
 
-def get_cast_config(cast_file: Path, playback_speed: float = 1.0) -> CastConfig:
+def get_cast_config(cast_file: Path, playback_speed: float = 1.0, base_fps: int = 30) -> CastConfig:
     """Get complete configuration for recording a cast file"""
     cols, lines = get_cast_dimensions(cast_file)
     command = get_cast_command(cast_file, playback_speed)
+    recording_fps = int(base_fps * playback_speed)
 
-    return CastConfig(cols=cols, lines=lines, command=command, playback_speed=playback_speed)
+    return CastConfig(
+        cols=cols, lines=lines, command=command, playback_speed=playback_speed, recording_fps=recording_fps
+    )
 
 
 def _parse_cast_header(cast_file: Path) -> tuple[int, int]:

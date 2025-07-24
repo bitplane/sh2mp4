@@ -23,6 +23,9 @@ $ sh2mp4 "sl" train.mp4 --watch
 # Convert .cast files to MP4 (with window size optimization)
 $ sh2mp4 --cast-file recording.cast output.mp4
 
+# Fast conversion using speed multiplier (8x faster conversion time)
+$ sh2mp4 --cast-file recording.cast output.mp4 --speed 8x
+
 # Apply theme and font settings to cast conversion
 $ sh2mp4 --cast-file demo.cast demo.mp4 --theme solarized-dark --font-size 16
 
@@ -53,6 +56,7 @@ $ sh2mp4 --measure-fonts
 | theme     | sh2mp4           | Terminal color theme                  |
 | watch     | False            | Show live preview during recording    |
 | cast_file | None             | Convert asciinema .cast file instead |
+| speed     | None             | Speed multiplier for fast cast conversion (2x, 4x, 8x) |
 
 ## Fonts
 
@@ -70,6 +74,23 @@ Available themes:
 - `solarized-dark`: Solarized Dark theme
 
 You can customize or add new themes in the `src/sh2mp4/themes.py` file.
+
+## Speed Conversion
+
+The `--speed` option accelerates cast file conversion without affecting the final video timing:
+
+- **2x, 4x, 8x faster conversion**: A 10-minute cast file with `--speed 8x` converts in ~1.25 minutes
+- **Real-time output**: Final MP4 plays at normal speed and maintains original timing
+- **How it works**:
+  1. Asciinema plays the cast file at accelerated speed (`--speed 8x`)
+  2. FFmpeg records at higher frame rate (8x normal fps)
+  3. Video is automatically slowed back down to real-time during encoding
+- **Window optimization**: Automatically scans cast file for maximum terminal dimensions to prevent text wrapping
+
+```bash
+# Convert a long recording quickly
+$ sh2mp4 --cast-file long-session.cast output.mp4 --speed 8x
+```
 
 ## Dependencies
 

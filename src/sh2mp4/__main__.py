@@ -2,31 +2,40 @@
 Main entry point for sh2mp4
 """
 
-import argparse
 import asyncio
-import os
 import sys
 from pathlib import Path
 
-from . import __version__
 from .display import DisplayManager
 from .terminal import TerminalManager
 from .recorder import Recorder
-from .themes import get_theme, list_themes
+from .themes import get_theme
 from .fonts import calculate_window_dimensions
 from .check_deps import main as check_dependencies
 from .measure_fonts import main as measure_fonts
-from .asciicast import get_cast_config
+from .args import parse_and_validate_args
 
 
 async def record_command(args) -> int:
     """Main recording function"""
+
+    # Args are now ready to use - no additional processing needed
+    if args.cast_file:
+        print(f"Cast file dimensions: {args.cols}x{args.lines} characters (optimized)")
+
     # Calculate window dimensions
     width, height = calculate_window_dimensions(args.cols, args.lines, args.font, args.font_size)
 
     print(f"Recording: {args.command}")
+
+    # Show speed info if using high-speed conversion
+    speed_info = ""
+    if args.recording_fps != args.fps:
+        speed_multiplier = args.recording_fps // args.fps
+        speed_info = f", recording at {speed_multiplier}x speed ({args.recording_fps}fps)"
+
     print(
-        f"Output: {args.output} ({width}x{height}, {args.fps}fps, "
+        f"Output: {args.output} ({width}x{height}, {args.fps}fps{speed_info}, "
         f"font: {args.font} {args.font_size}pt, theme: {args.theme})"
     )
 
@@ -42,7 +51,15 @@ async def record_command(args) -> int:
             await asyncio.sleep(1)
 
             # Start recording first (before command execution begins)
-            recorder = Recorder(display.display_name, width, height, args.fps, Path(args.output), watch=args.watch)
+            recorder = Recorder(
+                display.display_name,
+                width,
+                height,
+                args.fps,
+                Path(args.output),
+                watch=args.watch,
+                recording_fps=args.recording_fps,
+            )
 
             async with recorder:
                 await recorder.start()
@@ -79,74 +96,9 @@ async def record_command(args) -> int:
         return 1
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser"""
-    parser = argparse.ArgumentParser(
-        description="Record shell commands to MP4 videos",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
-Available themes: {', '.join(list_themes())}
-
-Examples:
-  sh2mp4 "ls -la" demo.mp4
-  sh2mp4 "htop" htop.mp4 --cols 120 --lines 40 --theme dark
-  sh2mp4 "timeout 10 cmatrix" matrix.mp4 --font-size 14
-  sh2mp4 --cast-file recording.cast output.mp4  # Convert asciinema cast file
-  sh2mp4 --check-deps  # Check if all dependencies are installed
-  sh2mp4 --measure-fonts  # Measure available fonts
-""",
-    )
-
-    parser.add_argument("command", nargs="?", help="Command to record")
-    parser.add_argument("output", nargs="?", default="output.mp4", help="Output MP4 file (default: output.mp4)")
-
-    # Cast file mode
-    parser.add_argument("--cast-file", help="Convert asciinema cast file to MP4 instead of recording live command")
-
-    # Terminal dimensions
-    parser.add_argument(
-        "--cols",
-        type=int,
-        default=int(os.popen("tput cols 2>/dev/null || echo 80").read().strip()),
-        help="Terminal width in characters (default: current terminal width)",
-    )
-    parser.add_argument(
-        "--lines",
-        type=int,
-        default=int(os.popen("tput lines 2>/dev/null || echo 24").read().strip()),
-        help="Terminal height in characters (default: current terminal height)",
-    )
-
-    # Video settings
-    parser.add_argument("--fps", type=int, default=30, help="Frames per second (default: 30)")
-
-    # Font settings
-    parser.add_argument("--font", default="DejaVu Sans Mono", help="Font family (default: DejaVu Sans Mono)")
-    parser.add_argument("--font-size", type=int, default=12, help="Font size in points (default: 12)")
-
-    # Theme
-    parser.add_argument("--theme", default="sh2mp4", choices=list_themes(), help="Color theme (default: sh2mp4)")
-
-    # Display
-    parser.add_argument("--display", type=int, help="X display number to use (default: auto-allocate)")
-
-    # Watch mode
-    parser.add_argument("--watch", action="store_true", help="Show live preview during recording")
-
-    # Utility modes
-    parser.add_argument("--check-deps", action="store_true", help="Check if all dependencies are installed")
-    parser.add_argument("--measure-fonts", action="store_true", help="Measure available monospace fonts")
-
-    # Version
-    parser.add_argument("--version", action="version", version=f"sh2mp4 {__version__}")
-
-    return parser
-
-
 def main() -> int:
     """Main entry point"""
-    parser = create_parser()
-    args = parser.parse_args()
+    args = parse_and_validate_args()
 
     # Handle utility modes
     if args.check_deps:
@@ -161,27 +113,6 @@ def main() -> int:
         result = measure_fonts()
         sys.argv = original_argv
         return result
-
-    # Handle cast file mode
-    if args.cast_file:
-        cast_file = Path(args.cast_file)
-        if not cast_file.exists():
-            print(f"Error: Cast file '{cast_file}' not found", file=sys.stderr)
-            return 1
-
-        try:
-            cast_config = get_cast_config(cast_file)
-            # Override args with cast file settings
-            args.command = cast_config.command
-            args.cols = cast_config.cols
-            args.lines = cast_config.lines
-        except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            return 1
-
-    # Validate that we have a command for recording mode
-    if not args.command:
-        parser.error("command is required when not using --check-deps, --measure-fonts, or --cast-file")
 
     # Check dependencies before recording (silently)
     from .check_deps import check_command

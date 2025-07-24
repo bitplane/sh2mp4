@@ -14,11 +14,21 @@ from typing import Optional
 class Recorder:
     """Handles screen recording with ffmpeg"""
 
-    def __init__(self, display_name: str, width: int, height: int, fps: int, output_path: Path, watch: bool = False):
+    def __init__(
+        self,
+        display_name: str,
+        width: int,
+        height: int,
+        fps: int,
+        output_path: Path,
+        watch: bool = False,
+        recording_fps: Optional[int] = None,
+    ):
         self.display_name = display_name
         self.width = width
         self.height = height
         self.fps = fps
+        self.recording_fps = recording_fps or fps  # Use recording_fps if provided, otherwise use output fps
         self.output_path = output_path
         self.watch = watch
         self.ffmpeg_process: Optional[asyncio.subprocess.Process] = None
@@ -37,21 +47,31 @@ class Recorder:
             "-f",
             "x11grab",
             "-framerate",
-            str(self.fps),
+            str(self.recording_fps),
             "-video_size",
             f"{self.width}x{self.height}",
             "-i",
             self.display_name,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            str(self.output_path),
         ]
+
+        # If recording at higher fps than output fps, add filter to slow down to real-time
+        if self.recording_fps != self.fps:
+            speed_factor = self.fps / self.recording_fps
+            cmd.extend(["-vf", f"setpts={1/speed_factor}*PTS", "-r", str(self.fps)])
+
+        cmd.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                str(self.output_path),
+            ]
+        )
 
         env = os.environ.copy()
         env["DISPLAY"] = self.display_name
