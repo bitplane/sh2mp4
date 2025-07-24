@@ -59,6 +59,8 @@ async def convert_cast_to_mp4(args) -> int:
             self.font = args.font
             self.font_size = args.font_size
             self.theme = args.theme
+            self.display = None  # Auto-allocate
+            self.watch = False  # No watch mode for cast files
 
     record_args = RecordArgs()
     return await record_command(record_args)

@@ -14,6 +14,8 @@ from .terminal import TerminalManager
 from .recorder import Recorder
 from .themes import get_theme, list_themes
 from .fonts import calculate_window_dimensions
+from .check_deps import main as check_dependencies
+from .measure_fonts import main as measure_fonts
 
 
 async def record_command(args) -> int:
@@ -39,7 +41,7 @@ async def record_command(args) -> int:
             await asyncio.sleep(1)
 
             # Start recording first (before command execution begins)
-            recorder = Recorder(display.display_name, width, height, args.fps, Path(args.output))
+            recorder = Recorder(display.display_name, width, height, args.fps, Path(args.output), watch=args.watch)
 
             async with recorder:
                 await recorder.start()
@@ -88,10 +90,12 @@ Examples:
   sh2mp4 "ls -la" demo.mp4
   sh2mp4 "htop" htop.mp4 --cols 120 --lines 40 --theme dark
   sh2mp4 "timeout 10 cmatrix" matrix.mp4 --font-size 14
+  sh2mp4 --check-deps  # Check if all dependencies are installed
+  sh2mp4 --measure-fonts  # Measure available fonts
 """,
     )
 
-    parser.add_argument("command", help="Command to record")
+    parser.add_argument("command", nargs="?", help="Command to record")
     parser.add_argument("output", nargs="?", default="output.mp4", help="Output MP4 file (default: output.mp4)")
 
     # Terminal dimensions
@@ -121,6 +125,13 @@ Examples:
     # Display
     parser.add_argument("--display", type=int, help="X display number to use (default: auto-allocate)")
 
+    # Watch mode
+    parser.add_argument("--watch", action="store_true", help="Show live preview during recording")
+
+    # Utility modes
+    parser.add_argument("--check-deps", action="store_true", help="Check if all dependencies are installed")
+    parser.add_argument("--measure-fonts", action="store_true", help="Measure available monospace fonts")
+
     # Version
     parser.add_argument("--version", action="version", version=f"sh2mp4 {__version__}")
 
@@ -131,6 +142,34 @@ def main() -> int:
     """Main entry point"""
     parser = create_parser()
     args = parser.parse_args()
+
+    # Handle utility modes
+    if args.check_deps:
+        return check_dependencies()
+
+    if args.measure_fonts:
+        # Run measure fonts with no arguments (measures all fonts)
+        import sys
+
+        original_argv = sys.argv
+        sys.argv = [sys.argv[0]]  # Remove all arguments
+        result = measure_fonts()
+        sys.argv = original_argv
+        return result
+
+    # Validate that we have a command for recording mode
+    if not args.command:
+        parser.error("command is required when not using --check-deps or --measure-fonts")
+
+    # Check dependencies before recording (silently)
+    from .check_deps import check_command
+
+    required_commands = ["xdotool", "wmctrl", "ffmpeg", "Xvfb", "openbox", "xterm", "unclutter"]
+    missing = [cmd for cmd in required_commands if not check_command(cmd)]
+    if missing:
+        print(f"Error: Missing required dependencies: {', '.join(missing)}", file=sys.stderr)
+        print("Run 'sh2mp4 --check-deps' for detailed information", file=sys.stderr)
+        return 1
 
     # Run the async recording function
     try:
