@@ -1,4 +1,6 @@
 .venv/
+dist
+.coverage
 __pycache__
 .agent-os
 *~
