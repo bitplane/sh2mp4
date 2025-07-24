@@ -115,6 +115,7 @@ Do wtf you want, but you're on your own.
 ## Links
 
 * [🏠 home](https://bitplane.net/dev/python/sh2mp4)
+* [🐍 pypi](https://pypi.org/project/sh2mp4)
 * [🐱 github](https://github.com/bitplane/sh2mp4)
 
 ### See also
