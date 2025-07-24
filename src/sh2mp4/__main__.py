@@ -16,6 +16,7 @@ from .themes import get_theme, list_themes
 from .fonts import calculate_window_dimensions
 from .check_deps import main as check_dependencies
 from .measure_fonts import main as measure_fonts
+from .asciicast import get_cast_config
 
 
 async def record_command(args) -> int:
@@ -90,6 +91,7 @@ Examples:
   sh2mp4 "ls -la" demo.mp4
   sh2mp4 "htop" htop.mp4 --cols 120 --lines 40 --theme dark
   sh2mp4 "timeout 10 cmatrix" matrix.mp4 --font-size 14
+  sh2mp4 --cast-file recording.cast output.mp4  # Convert asciinema cast file
   sh2mp4 --check-deps  # Check if all dependencies are installed
   sh2mp4 --measure-fonts  # Measure available fonts
 """,
@@ -97,6 +99,9 @@ Examples:
 
     parser.add_argument("command", nargs="?", help="Command to record")
     parser.add_argument("output", nargs="?", default="output.mp4", help="Output MP4 file (default: output.mp4)")
+
+    # Cast file mode
+    parser.add_argument("--cast-file", help="Convert asciinema cast file to MP4 instead of recording live command")
 
     # Terminal dimensions
     parser.add_argument(
@@ -157,9 +162,26 @@ def main() -> int:
         sys.argv = original_argv
         return result
 
+    # Handle cast file mode
+    if args.cast_file:
+        cast_file = Path(args.cast_file)
+        if not cast_file.exists():
+            print(f"Error: Cast file '{cast_file}' not found", file=sys.stderr)
+            return 1
+
+        try:
+            cast_config = get_cast_config(cast_file)
+            # Override args with cast file settings
+            args.command = cast_config.command
+            args.cols = cast_config.cols
+            args.lines = cast_config.lines
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
     # Validate that we have a command for recording mode
     if not args.command:
-        parser.error("command is required when not using --check-deps or --measure-fonts")
+        parser.error("command is required when not using --check-deps, --measure-fonts, or --cast-file")
 
     # Check dependencies before recording (silently)
     from .check_deps import check_command

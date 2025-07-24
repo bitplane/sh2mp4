@@ -1,7 +1,7 @@
 [project]
 name = "sh2mp4"
 description = "Records shell commands to MP4 videos"
-version = "0.2.3"
+version = "0.3.0"
 authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
 ]
@@ -26,7 +26,6 @@ dev = [
 
 [project.scripts]
 sh2mp4 = "sh2mp4.__main__:main"
-cast2mp4 = "sh2mp4.cast2mp4:main"
 
 [build-system]
 build-backend = "flit_core.buildapi"
