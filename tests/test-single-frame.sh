@@ -22,7 +22,7 @@ rm -f "$OUTPUT_VIDEO" "$OUTPUT_FRAME"
 # Source venv and record with sleeps
 echo "Recording..."
 source .venv/bin/activate
-sh2mp4 "sleep 3; $COMMAND; sleep 3" "$OUTPUT_VIDEO"
+sh2mp4 "$COMMAND" "$OUTPUT_VIDEO"
 
 # Get video duration and calculate middle frame
 echo "Extracting middle frame..."

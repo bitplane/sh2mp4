@@ -55,12 +55,26 @@ class TerminalManager:
     def _create_command_script(self, command: str) -> Path:
         """Create a script file with the command to execute"""
         script_path = self.temp_dir / "command.sh"
+        sync_file = self.temp_dir / "recorder_ready"
 
         script_content = f"""#!/usr/bin/env bash
 set -euo pipefail
 
+# Wait for recorder to be ready
+echo "Waiting for recorder to start..."
+while [ ! -f "{sync_file}" ]; do
+    sleep 0.1
+done
+echo "Recorder ready, executing command..."
+
+# Give recorder a moment to capture first frames
+sleep 0.5
+
 # Execute the command
 {command}
+
+# Give recorder a moment to capture output
+sleep 0.5
 
 # Exit when done
 exit 0
@@ -70,6 +84,12 @@ exit 0
         script_path.chmod(0o755)
 
         return script_path
+
+    def signal_recorder_ready(self) -> None:
+        """Signal that the recorder is ready and command can proceed"""
+        if self.temp_dir:
+            sync_file = self.temp_dir / "recorder_ready"
+            sync_file.touch()
 
     async def _start_xterm(self, script_path: Path) -> None:
         """Start the xterm process"""

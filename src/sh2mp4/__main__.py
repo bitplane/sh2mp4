@@ -38,22 +38,23 @@ async def record_command(args) -> int:
             # Wait a moment for display to be ready
             await asyncio.sleep(1)
 
-            # Start terminal
-            terminal = TerminalManager(
-                display.display_name, theme, args.font, args.font_size, args.cols, args.lines, width, height
-            )
+            # Start recording first (before command execution begins)
+            recorder = Recorder(display.display_name, width, height, args.fps, Path(args.output))
 
-            async with terminal:
-                await terminal.start(args.command)
+            async with recorder:
+                await recorder.start()
+                print("Recording started...")
 
-                # Wait another moment for terminal to be fully visible
-                await asyncio.sleep(1)
+                # Now start terminal and command
+                terminal = TerminalManager(
+                    display.display_name, theme, args.font, args.font_size, args.cols, args.lines, width, height
+                )
 
-                # Start recording
-                recorder = Recorder(display.display_name, width, height, args.fps, Path(args.output))
+                async with terminal:
+                    await terminal.start(args.command)
 
-                async with recorder:
-                    await recorder.start()
+                    # Signal that recorder is ready so command can proceed
+                    terminal.signal_recorder_ready()
                     print("Recording... (waiting for command to complete)")
 
                     # Wait for command to complete
