@@ -82,6 +82,9 @@ source "$TMPDIR/env.sh"
 
 # Execute the actual command, reading from the FIFO
 $COMMAND < "$FIFO"
+
+# Exit explicitly after command completes
+exit 0
 EOF
 chmod +x "$TMPDIR/command.sh"
 

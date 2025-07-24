@@ -132,6 +132,21 @@ for i in {1..50}; do
   sleep 0.1
 done
 
-# Record the screen to output file
+# Wait for terminal content to render
+sleep 1
+
+# Record the screen to output file in background
 ffmpeg -y -f x11grab -framerate "$FPS" -video_size "${W}x${H}" -i "$DISPLAY" \
-  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT"
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p "$OUT" &
+FFMPEG_PID=$!
+
+# Wait for xterm to finish
+echo "Recording... (waiting for terminal to close)"
+wait "$TERM_PID"
+
+# Stop recording
+echo "Terminal closed, stopping recording..."
+kill -INT "$FFMPEG_PID" 2>/dev/null || true
+wait "$FFMPEG_PID" 2>/dev/null || true
+
+echo "Recording complete: $OUT"
