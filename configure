@@ -5,7 +5,7 @@ echo "Checking dependencies for terminal-to-mp4..."
 
 # Check for required tools
 MISSING=0
-for cmd in xdotool wmctrl ffmpeg Xvfb openbox xterm asciinema unclutter; do
+for cmd in xdotool wmctrl ffmpeg Xvfb openbox xterm asciinema unclutter jq; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "❌ Missing: $cmd"
     MISSING=$((MISSING + 1))

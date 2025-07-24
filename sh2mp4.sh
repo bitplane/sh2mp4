@@ -8,12 +8,25 @@ COLS="${3:-$(tput cols)}"  # Use current terminal width if not specified
 LINES="${4:-$(tput lines)}"  # Use current terminal height if not specified
 FPS="${5:-30}"    # Default to 30 fps
 FONT="${6:-DejaVu Sans Mono}"  # Default font
-THEME="${7:-sh2mp4}"  # Default to sh2mp4 theme
+FONT_SIZE="${7:-12}"  # Default to 12pt font
+THEME="${8:-sh2mp4}"  # Default to sh2mp4 theme
 
-# Calculate window dimensions based on font size (font size 6)
-# From measurement: width=5px, height=10px
-CHAR_WIDTH=5
-CHAR_HEIGHT=10
+# Calculate character dimensions based on font size
+# Based on measurements from measure_fonts.py for DejaVu Sans Mono
+case "$FONT_SIZE" in
+    4)  CHAR_WIDTH=3; CHAR_HEIGHT=7 ;;
+    6)  CHAR_WIDTH=5; CHAR_HEIGHT=10 ;;
+    8)  CHAR_WIDTH=6; CHAR_HEIGHT=13 ;;
+    10) CHAR_WIDTH=8; CHAR_HEIGHT=17 ;;
+    12) CHAR_WIDTH=10; CHAR_HEIGHT=19 ;;
+    14) CHAR_WIDTH=11; CHAR_HEIGHT=23 ;;
+    16) CHAR_WIDTH=13; CHAR_HEIGHT=26 ;;
+    18) CHAR_WIDTH=14; CHAR_HEIGHT=29 ;;
+    20) CHAR_WIDTH=16; CHAR_HEIGHT=32 ;;
+    *) 
+        echo "Warning: Unsupported font size $FONT_SIZE, using defaults for size 12"
+        CHAR_WIDTH=10; CHAR_HEIGHT=19 ;;
+esac
 W=$(echo "$COLS * $CHAR_WIDTH" | bc | cut -d. -f1)
 H=$(echo "$LINES * $CHAR_HEIGHT" | bc | cut -d. -f1)
 
@@ -23,7 +36,7 @@ H=$((H + (H % 2)))  # Add 1 if odd
 
 # Print recording information
 echo "Recording: $COMMAND"
-echo "Output: $OUT (${W}x${H}, ${FPS}fps, theme: $THEME)"
+echo "Output: $OUT (${W}x${H}, ${FPS}fps, font: $FONT ${FONT_SIZE}pt, theme: $THEME)"
 
 SCRIPT_PATH="$(realpath ./run.sh)"
 LAUNCH_SCRIPT="./_launch.sh"  # Renamed to _launch.sh
@@ -99,6 +112,6 @@ env -i \
   XDG_CONFIG_HOME="$CONFIG_DIR" \
   XDG_DATA_HOME="$DATA_DIR" \
   W="$W" H="$H" OUT="$OUT" FPS="$FPS" \
-  COLS="$COLS" LINES="$LINES" FONT="$FONT" THEME="$THEME" \
+  COLS="$COLS" LINES="$LINES" FONT="$FONT" FONT_SIZE="$FONT_SIZE" THEME="$THEME" \
   SCRIPT_PATH="$TMPDIR/command.sh" \
   bash "$LAUNCH_SCRIPT"

@@ -77,7 +77,7 @@ trap cleanup EXIT INT TERM HUP
 
 # Launch xterm with proper font, UTF-8, and box-drawing - no titlebar/decorations
 DISPLAY=$DISPLAY xterm \
-  -fa "$FONT" -fs 6 \
+  -fa "$FONT" -fs "$FONT_SIZE" \
   -bg "${TERM_BG}" -fg "${TERM_FG}" \
   -xrm "XTerm*color0: ${TERM_COLOR0}" \
   -xrm "XTerm*color1: ${TERM_COLOR1}" \
