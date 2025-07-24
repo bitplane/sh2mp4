@@ -82,27 +82,19 @@ def _find_max_cast_dimensions(cast_file: Path) -> tuple[int, int]:
 
                 try:
                     event = json.loads(line)
-                    # Check if this is output data (type "o")
-                    if len(event) >= 3 and event[1] == "o":
-                        output = event[2]
-
-                        # Look for ANSI escape sequences that indicate window resize
-                        # CSI 8 ; height ; width t (resize window)
-                        if "\x1b[8;" in output:
-                            # Extract window size from resize escape sequence
-                            parts = output.split("\x1b[8;")
-                            for part in parts[1:]:  # Skip first part before escape seq
-                                if "t" in part:
-                                    size_part = part.split("t")[0]
-                                    if ";" in size_part:
-                                        try:
-                                            h, w = size_part.split(";", 1)
-                                            height = int(h)
-                                            width = int(w.split(";")[0])  # In case there's more after
-                                            max_width = max(max_width, width)
-                                            max_height = max(max_height, height)
-                                        except (ValueError, IndexError):
-                                            continue
+                    # Check if this is a resize event (type "r")
+                    if len(event) >= 3 and event[1] == "r":
+                        # Asciinema resize format: [timestamp, "r", "WIDTHxHEIGHT"]
+                        resize_data = event[2]
+                        if "x" in resize_data:
+                            try:
+                                width_str, height_str = resize_data.split("x", 1)
+                                width = int(width_str)
+                                height = int(height_str)
+                                max_width = max(max_width, width)
+                                max_height = max(max_height, height)
+                            except (ValueError, IndexError):
+                                continue
 
                 except (json.JSONDecodeError, IndexError):
                     # Skip malformed lines
