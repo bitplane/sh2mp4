@@ -141,15 +141,28 @@ class TestErrorCases:
 class TestArgumentPrecedence:
     """Test how arguments interact and override each other"""
 
-    def test_cast_file_overrides_dimensions(self):
-        """Test that cast file dimensions override CLI dimensions"""
+    def test_cast_file_respects_user_dimensions(self):
+        """Test that user-provided dimensions override cast file dimensions"""
         cast_file = create_test_cast_file()
         try:
             args = parse_and_validate_args(
                 ["--cast-file", str(cast_file), "--cols", "120", "--lines", "40", "output-file.mp4"]
             )
 
-            # Should use dimensions from cast file (80x24), not CLI args
+            # Should use user-provided dimensions, not cast file dims
+            assert args.cols == 120  # User provided
+            assert args.lines == 40  # User provided
+            assert args.output == "output-file.mp4"  # Output filename preserved
+        finally:
+            cast_file.unlink()
+
+    def test_cast_file_uses_optimized_dimensions_when_not_specified(self):
+        """Test that cast file dimensions are used when user doesn't specify them"""
+        cast_file = create_test_cast_file()
+        try:
+            args = parse_and_validate_args(["--cast-file", str(cast_file), "output-file.mp4"])
+
+            # Should use dimensions from cast file when not explicitly specified
             assert args.cols == 80  # From cast file header
             assert args.lines == 24  # From cast file header
             assert args.output == "output-file.mp4"  # Output filename preserved

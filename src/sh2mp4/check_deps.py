@@ -34,15 +34,31 @@ def check_monospace_fonts() -> bool:
         return False
 
 
+def get_required_commands(cast_file_mode: bool = False) -> list[str]:
+    """Get list of required commands based on mode"""
+    commands = ["xdotool", "wmctrl", "ffmpeg", "Xvfb", "openbox", "xterm", "unclutter"]
+
+    if cast_file_mode:
+        commands.append("asciinema")
+
+    return commands
+
+
+def check_runtime_dependencies(cast_file_mode: bool = False) -> list[str]:
+    """Check runtime dependencies and return list of missing commands"""
+    required_commands = get_required_commands(cast_file_mode)
+    return [cmd for cmd in required_commands if not check_command(cmd)]
+
+
 def main() -> int:
     """Check all dependencies and report status"""
     print("Checking dependencies for sh2mp4...")
 
     # Required commands
-    required_commands = ["xdotool", "wmctrl", "ffmpeg", "Xvfb", "openbox", "xterm", "unclutter"]
+    required_commands = get_required_commands()
 
     # Optional commands (not required for core functionality)
-    optional_commands = ["asciinema", "jq"]
+    optional_commands = ["asciinema"]
 
     missing_count = 0
 
@@ -54,12 +70,13 @@ def main() -> int:
             print(f"❌ Missing: {cmd}")
             missing_count += 1
 
-    # Check optional commands
+    # Check optional commands (but don't count asciinema as optional if it's already required)
     for cmd in optional_commands:
-        if check_command(cmd):
-            print(f"✓ Found: {cmd} (optional)")
-        else:
-            print(f"⚠️  Missing: {cmd} (optional)")
+        if cmd not in required_commands:
+            if check_command(cmd):
+                print(f"✓ Found: {cmd} (optional)")
+            else:
+                print(f"⚠️  Missing: {cmd} (optional)")
 
     # Check locale
     if check_locale():

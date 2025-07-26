@@ -115,10 +115,9 @@ def main() -> int:
         return result
 
     # Check dependencies before recording (silently)
-    from .check_deps import check_command
+    from .check_deps import check_runtime_dependencies
 
-    required_commands = ["xdotool", "wmctrl", "ffmpeg", "Xvfb", "openbox", "xterm", "unclutter"]
-    missing = [cmd for cmd in required_commands if not check_command(cmd)]
+    missing = check_runtime_dependencies(cast_file_mode=bool(args.cast_file))
     if missing:
         print(f"Error: Missing required dependencies: {', '.join(missing)}", file=sys.stderr)
         print("Run 'sh2mp4 --check-deps' for detailed information", file=sys.stderr)
