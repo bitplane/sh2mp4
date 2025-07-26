@@ -76,6 +76,10 @@ Examples:
 
     args = parser.parse_args(argv)
 
+    # Check if cols/lines were explicitly provided by user
+    user_provided_cols = "--cols" in (argv or sys.argv)
+    user_provided_lines = "--lines" in (argv or sys.argv)
+
     # Process arguments to get them into "ready to execute" state
     if args.cast_file:
         # Cast file mode - process the cast file and modify args
@@ -98,8 +102,11 @@ Examples:
 
             # Override args with cast file settings
             args.command = cast_config.command
-            args.cols = cast_config.cols
-            args.lines = cast_config.lines
+            # Only override dimensions if user didn't explicitly specify them
+            if not user_provided_cols:
+                args.cols = cast_config.cols
+            if not user_provided_lines:
+                args.lines = cast_config.lines
             args.recording_fps = cast_config.recording_fps
 
         except ValueError as e:
