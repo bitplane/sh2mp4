@@ -61,11 +61,9 @@ class TerminalManager:
 set -euo pipefail
 
 # Wait for recorder to be ready
-echo "Waiting for recorder to start..."
 while [ ! -f "{sync_file}" ]; do
     sleep 0.1
 done
-echo "Recorder ready, executing command..."
 
 # Give recorder a moment to capture first frames
 sleep 0.5
