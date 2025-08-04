@@ -59,6 +59,7 @@ async def record_command(args) -> int:
                 Path(args.output),
                 watch=args.watch,
                 recording_fps=args.recording_fps,
+                debug=getattr(args, "debug", False),
             )
 
             async with recorder:

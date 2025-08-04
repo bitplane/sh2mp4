@@ -67,6 +67,7 @@ Examples:
     # Options
     parser.add_argument("--watch", action="store_true", help="Show live preview during recording")
     parser.add_argument("--speed", choices=["2x", "4x", "8x"], help="Playback speed for cast files")
+    parser.add_argument("--debug", action="store_true", help="Enable debug output from ffmpeg")
 
     # Utility modes
     parser.add_argument("--check-deps", action="store_true", help="Check dependencies")

@@ -23,6 +23,7 @@ class Recorder:
         output_path: Path,
         watch: bool = False,
         recording_fps: Optional[int] = None,
+        debug: bool = False,
     ):
         self.display_name = display_name
         self.width = width
@@ -31,18 +32,35 @@ class Recorder:
         self.recording_fps = recording_fps or fps  # Use recording_fps if provided, otherwise use output fps
         self.output_path = output_path
         self.watch = watch
+        self.debug = debug
         self.ffmpeg_process: Optional[asyncio.subprocess.Process] = None
         self.watch_task: Optional[asyncio.Task] = None
 
     async def start(self) -> None:
         """Start recording the display"""
+        # Test X11 connection if in debug mode
+        if self.debug:
+            test_proc = await asyncio.create_subprocess_exec(
+                "xset",
+                "-display",
+                self.display_name,
+                "q",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await test_proc.communicate()
+            if test_proc.returncode != 0:
+                print(f"DEBUG: X11 connection test failed: {stderr.decode()}", file=sys.stderr)
+            else:
+                print(f"DEBUG: X11 connection to {self.display_name} OK", file=sys.stderr)
+
         cmd = [
             "ffmpeg",
-            "-nostdin",  # Disable console interactions
+            # Removed -nostdin to allow sending 'q' to stop recording
             "-nostats",  # Disable progress statistics
             "-hide_banner",  # Hide copyright banner
             "-loglevel",
-            "error",  # Only show errors
+            "error" if not self.debug else "info",  # Show more info in debug mode
             "-y",  # Overwrite output file
             "-f",
             "x11grab",
@@ -76,8 +94,20 @@ class Recorder:
         env = os.environ.copy()
         env["DISPLAY"] = self.display_name
 
+        if self.debug:
+            print(f"DEBUG: ffmpeg command: {' '.join(cmd)}", file=sys.stderr)
+            stderr_dest = None
+            stdout_dest = None
+        else:
+            stderr_dest = asyncio.subprocess.DEVNULL
+            stdout_dest = asyncio.subprocess.DEVNULL
+
         self.ffmpeg_process = await asyncio.create_subprocess_exec(
-            *cmd, env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+            *cmd,
+            env=env,
+            stdin=asyncio.subprocess.PIPE,  # Allow stdin for sending 'q' to stop
+            stdout=stdout_dest,
+            stderr=stderr_dest,
         )
 
         # Start watch task if requested
@@ -163,17 +193,36 @@ class Recorder:
             except asyncio.CancelledError:
                 pass
 
-        # Send SIGINT to gracefully stop ffmpeg
-        self.ffmpeg_process.send_signal(2)  # SIGINT
+        # Send 'q' to stdin to gracefully stop ffmpeg
+        if self.debug:
+            print("DEBUG: Sending 'q' to ffmpeg stdin...", file=sys.stderr)
+        try:
+            self.ffmpeg_process.stdin.write(b"q")
+            await self.ffmpeg_process.stdin.drain()
+            self.ffmpeg_process.stdin.close()
+        except Exception as e:
+            if self.debug:
+                print(f"DEBUG: Failed to send 'q': {e}", file=sys.stderr)
+            # Fall back to SIGTERM
+            self.ffmpeg_process.terminate()
 
         try:
             # Wait for ffmpeg to finish processing
-            return_code = await asyncio.wait_for(self.ffmpeg_process.wait(), timeout=30)
+            if self.debug:
+                print("DEBUG: Waiting for ffmpeg to terminate...", file=sys.stderr)
+            return_code = await asyncio.wait_for(self.ffmpeg_process.wait(), timeout=5)
+            if self.debug:
+                print(f"DEBUG: ffmpeg terminated with code {return_code}", file=sys.stderr)
             return return_code
         except asyncio.TimeoutError:
+            if self.debug:
+                print("DEBUG: ffmpeg timeout, force killing...", file=sys.stderr)
             # Force kill if it doesn't stop gracefully
             self.ffmpeg_process.kill()
-            return await self.ffmpeg_process.wait()
+            return_code = await self.ffmpeg_process.wait()
+            if self.debug:
+                print(f"DEBUG: ffmpeg killed with code {return_code}", file=sys.stderr)
+            return return_code
 
     async def is_running(self) -> bool:
         """Check if recording is active"""

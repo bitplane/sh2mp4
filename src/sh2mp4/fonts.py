@@ -90,11 +90,21 @@ def measure_all_fonts() -> Dict[str, Dict[int, FontMetrics]]:
 
 
 def calculate_window_dimensions(cols: int, lines: int, font_name: str, font_size: int) -> Tuple[int, int]:
-    """Calculate pixel dimensions for terminal window"""
+    """Calculate pixel dimensions for terminal window with padding for xterm margins"""
     metrics = get_font_metrics(font_name, font_size)
 
     width = cols * metrics.width
     height = lines * metrics.height
+
+    # Add padding for xterm internal margins and window manager overhead
+    HORIZONTAL_PADDING = 20  # 10 pixels per side for margins
+
+    # Add one full character height as grace space to prevent scrolling
+    # if command output wraps or produces an extra line
+    height += metrics.height  # One extra line of grace
+
+    width += HORIZONTAL_PADDING
+    height += HORIZONTAL_PADDING  # Keep some vertical padding for window manager
 
     # Ensure dimensions are even (required for H.264 encoding)
     width += width % 2
