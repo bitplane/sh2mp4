@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .asciicast import get_cast_config
 from .themes import list_themes
 
 
@@ -90,8 +91,6 @@ Examples:
         # In cast file mode, if command is provided, treat it as output filename
         if args.command:
             args.output = args.command
-
-        from .asciicast import get_cast_config
 
         # Parse speed multiplier
         speed_multiplier = 1.0

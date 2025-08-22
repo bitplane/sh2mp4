@@ -4,6 +4,7 @@ Virtual display management using Xvfb
 
 import asyncio
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -135,8 +136,6 @@ class DisplayManager:
 
         # Clean up temp directory
         if self.temp_dir and self.temp_dir.exists():
-            import shutil
-
             shutil.rmtree(self.temp_dir)
 
         # Clean DISPLAY env var

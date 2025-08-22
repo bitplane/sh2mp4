@@ -4,15 +4,11 @@ Simple ASCII art preview for terminal display
 
 from pathlib import Path
 from typing import Optional
+from PIL import Image
 
 
 def image_to_ascii(image_path: Path, width: int = 80, height: int = 24) -> Optional[str]:
     """Convert an image to ASCII art for terminal display"""
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-
     # ASCII characters from darkest to lightest
     ascii_chars = " .:-=+*#%@"
 
@@ -63,11 +59,6 @@ def image_to_ascii(image_path: Path, width: int = 80, height: int = 24) -> Optio
 
 def colored_blocks_preview(image_path: Path, width: int = 80, height: int = 24) -> Optional[str]:
     """Convert image to colored Unicode block characters"""
-    try:
-        from PIL import Image
-    except ImportError:
-        return None
-
     try:
         # Open and resize image
         img = Image.open(image_path)

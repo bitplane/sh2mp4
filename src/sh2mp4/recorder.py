@@ -10,6 +10,8 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+from .ascii_preview import colored_blocks_preview
+
 
 class Recorder:
     """Handles screen recording with ffmpeg"""
@@ -116,8 +118,6 @@ class Recorder:
 
     async def _watch_display(self) -> None:
         """Show live preview of the display being recorded"""
-        from .ascii_preview import colored_blocks_preview
-
         temp_dir = tempfile.mkdtemp(prefix="sh2mp4_watch_")
         screenshot_path = os.path.join(temp_dir, "watch.png")
 

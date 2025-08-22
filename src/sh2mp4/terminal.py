@@ -4,6 +4,7 @@ Terminal (xterm) management for command execution
 
 import asyncio
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -239,8 +240,6 @@ exit 0
 
         # Clean up temp directory
         if self.temp_dir and self.temp_dir.exists():
-            import shutil
-
             shutil.rmtree(self.temp_dir)
 
     async def __aenter__(self):

@@ -2,10 +2,15 @@
 Font handling and character dimension calculation
 """
 
-import tkinter as tk
-from tkinter import font as tkfont
 from dataclasses import dataclass
 from typing import Dict, Tuple
+
+try:
+    import tkinter as tk
+    from tkinter import font as tkfont
+except ImportError:
+    tk = None
+    tkfont = None
 
 
 @dataclass
@@ -50,6 +55,9 @@ def get_font_metrics(font_name: str, font_size: int) -> FontMetrics:
 
 def measure_font(font_name: str, font_size: int) -> FontMetrics:
     """Dynamically measure font character dimensions using tkinter"""
+    if tk is None or tkfont is None:
+        raise ImportError("tkinter is not available")
+
     root = tk.Tk()
     root.withdraw()  # Hide the main window
 

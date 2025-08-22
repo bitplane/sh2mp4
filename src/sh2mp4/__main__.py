@@ -11,7 +11,7 @@ from .terminal import TerminalManager
 from .recorder import Recorder
 from .themes import get_theme
 from .fonts import calculate_window_dimensions
-from .check_deps import main as check_dependencies
+from .check_deps import main as check_dependencies, check_runtime_dependencies
 from .measure_fonts import main as measure_fonts
 from .args import parse_and_validate_args
 
@@ -107,8 +107,6 @@ def main() -> int:
 
     if args.measure_fonts:
         # Run measure fonts with no arguments (measures all fonts)
-        import sys
-
         original_argv = sys.argv
         sys.argv = [sys.argv[0]]  # Remove all arguments
         result = measure_fonts()
@@ -116,8 +114,6 @@ def main() -> int:
         return result
 
     # Check dependencies before recording (silently)
-    from .check_deps import check_runtime_dependencies
-
     missing = check_runtime_dependencies(cast_file_mode=bool(args.cast_file))
     if missing:
         print(f"Error: Missing required dependencies: {', '.join(missing)}", file=sys.stderr)
