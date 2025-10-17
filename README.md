@@ -44,25 +44,28 @@ $ sh2mp4 --measure-fonts
 
 ## Defaults
 
-| arg       | value            | description                           |
-| --------- | ---------------- | ------------------------------------- |
-| command   | (required)       | Command or script to run in recording |
-| output    | output.mp4       | Output file name                      |
-| cols      | `$(tput cols)`   | Terminal width in characters          |
-| lines     | `$(tput rows)`   | Terminal height in characters         |
-| fps       | 30               | Frames per second for recording       |
-| font      | DejaVu Sans Mono | Font to use (must be monospace)       |
-| font_size | 12               | Font size in points (4,6,8,10,12,14,16,18,20) |
-| theme     | sh2mp4           | Terminal color theme                  |
-| watch     | False            | Show live preview during recording    |
-| cast_file | None             | Convert asciinema .cast file instead |
-| speed     | None             | Speed multiplier for fast cast conversion (2x, 4x, 8x) |
+| arg       | value            | description                                   |
+| --------- | ---------------- | --------------------------------------------- |
+| command   | (required)       | Command or script to run in recording         |
+| output    | output.mp4       | Output file name                              |
+| cols      | `$(tput cols)`   | Terminal width in characters                  |
+| lines     | `$(tput rows)`   | Terminal height in characters                 |
+| fps       | 30               | Frames per second for recording               |
+| font      | DejaVu Sans Mono | Font to use (must be monospace)               |
+| font-size | 12               | Font size in points (4,6,8,10,12,14,16,18,20) |
+| theme     | sh2mp4           | Terminal color theme                          |
+| watch     | False            | Show live preview during recording            |
+| cast-file | None             | Convert asciinema .cast file instead          |
+| speed     | 1x               | Speed multiplier for cast files (2x, 4x, 8x)  |
 
 ## Fonts
 
 Font size is configurable (default 12pt). Character dimensions are automatically
-calculated based on the font size. Supported sizes: 4, 6, 8, 10, 12, 14, 16, 18, 20.
-Run `sh2mp4 --measure-fonts` to see pixel dimensions for all available fonts and sizes.
+calculated based on the font size. Supported sizes: 4, 6, 8, 10, 12, 14, 16, 18,
+20.
+
+Run `sh2mp4 --measure-fonts` to see pixel dimensions for all available fonts and
+sizes.
 
 ## Themes
 
@@ -75,17 +78,17 @@ Available themes:
 
 You can customize or add new themes in the `src/sh2mp4/themes.py` file.
 
-## Speed Conversion
+## Cast Conversion
 
-The `--speed` option accelerates cast file conversion without affecting the final video timing:
+The `--speed` option accelerates cast file conversion without affecting the final
+video timing:
 
-- **2x, 4x, 8x faster conversion**: A 10-minute cast file with `--speed 8x` converts in ~1.25 minutes
-- **Real-time output**: Final MP4 plays at normal speed and maintains original timing
-- **How it works**:
-  1. Asciinema plays the cast file at accelerated speed (`--speed 8x`)
-  2. FFmpeg records at higher frame rate (8x normal fps)
-  3. Video is automatically slowed back down to real-time during encoding
-- **Window optimization**: Automatically scans cast file for maximum terminal dimensions to prevent text wrapping
+* ⏩ Asciinema plays the cast file at accelerated speed (`--speed 8x`)
+* 🔥 FFmpeg records at higher frame rate (8x normal fps)
+* 🧙 Video is automatically slowed back down to real-time during encoding
+
+The cast file is also scanned for the maximum terminal dimensions, to prevent
+text wrapping.
 
 ```bash
 # Convert a long recording quickly
@@ -95,12 +98,14 @@ $ sh2mp4 --cast-file long-session.cast output.mp4 --speed 8x
 ## Dependencies
 
 Run `sh2mp4 --check-deps` to see the full list of required system dependencies.
+
 The main requirements are:
-- ffmpeg (with libx264 support)
-- Xvfb (virtual framebuffer)
-- xterm (terminal emulator)
-- openbox (window manager)
-- Various X11 utilities (wmctrl, xdotool, unclutter)
+
+* 🎬 ffmpeg (with libx264 support)
+* 🖼️ Xvfb (virtual framebuffer)
+* 🗔 xterm (terminal emulator)
+* 🪟 openbox (window manager)
+* ✖️ Various X11 utilities (wmctrl, xdotool, unclutter)
 
 You might want to run this in a container due to the number of dependencies.
 
