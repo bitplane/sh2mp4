@@ -2,4 +2,6 @@
 sh2mp4 - Records shell commands to MP4 videos
 """
 
-__version__ = "0.2.0"
+from importlib.metadata import version
+
+__version__ = version("sh2mp4")
