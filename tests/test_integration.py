@@ -122,3 +122,31 @@ def test_actual_terminal_grid(tmp_path, font, size):
     )
     assert result.returncode == 0, result.stderr
     assert grid.read_text().strip() == "25 81"
+
+
+async def test_empty_trim_is_an_error(tmp_path):
+    from sh2mp4.recorder import Recorder
+
+    capture = tmp_path / "capture.mkv"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=size=32x32:duration=0.1",
+            "-c:v",
+            "ffv1",
+            str(capture),
+        ],
+        check=True,
+    )
+    recorder = Recorder(":99", 32, 32, 30, tmp_path / "empty.mp4")
+    recorder._capture_path = capture
+    recorder._content_start = 1000
+    recorder._content_end = 1001
+    with pytest.raises(RuntimeError, match="encoding failed"):
+        await recorder.encode()

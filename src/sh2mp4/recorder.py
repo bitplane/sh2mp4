@@ -156,6 +156,8 @@ class Recorder:
             "-loglevel",
             "error",
             "-y",
+            "-abort_on",
+            "empty_output",
             "-copyts",
             "-i",
             str(self._capture_path),
