@@ -46,6 +46,8 @@ class DisplayManager:
             )
             try:
                 await asyncio.wait_for(proc.wait(), 2)
+            except asyncio.TimeoutError as e:
+                raise RuntimeError("Timed out checking Openbox readiness with wmctrl") from e
             finally:
                 await terminate_process(proc)
             if proc.returncode == 0:
@@ -101,6 +103,8 @@ class DisplayManager:
             if not await self.is_ready():
                 raise RuntimeError("Xvfb display is not accessible")
             print(f"Using display {self.display_name}")
+        except asyncio.TimeoutError as e:
+            raise RuntimeError("Timed out waiting for Xvfb readiness") from e
         finally:
             if write_fd is not None:
                 os.close(write_fd)

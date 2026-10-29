@@ -30,3 +30,18 @@ async def test_reject_occupied_display(monkeypatch):
         with pytest.raises(RuntimeError, match="already in use"):
             await display.start(100, 100)
     spawn.assert_not_called()
+
+
+async def test_connection_timeout_is_false_and_reaps_child(monkeypatch):
+    from sh2mp4.xserver import test_display_connection as connect
+
+    process = await asyncio.create_subprocess_exec("sleep", "60")
+    original_wait = asyncio.wait_for
+
+    async def short_wait(awaitable, timeout):
+        return await original_wait(awaitable, min(timeout, 0.01))
+
+    monkeypatch.setattr("sh2mp4.xserver.asyncio.create_subprocess_exec", AsyncMock(return_value=process))
+    monkeypatch.setattr("sh2mp4.xserver.asyncio.wait_for", short_wait)
+    assert not await connect(":99")
+    assert process.returncode is not None

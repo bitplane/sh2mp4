@@ -123,38 +123,29 @@ while :; do sleep 0.1; done
         )
 
     async def _wait_for_window(self) -> None:
-        """Wait for the xterm window to appear"""
-        for i in range(50):  # Try for up to 5 seconds
+        for _ in range(50):
             if self.xterm_process.returncode is not None:
                 raise RuntimeError("Xterm exited during startup")
+            proc = await asyncio.create_subprocess_exec(
+                "xdotool",
+                "search",
+                "--onlyvisible",
+                "--pid",
+                str(self.xterm_process.pid),
+                env={**os.environ, "DISPLAY": self.display_name},
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
             try:
-                # Find xterm window
-                proc = await asyncio.create_subprocess_exec(
-                    "xdotool",
-                    "search",
-                    "--onlyvisible",
-                    "--class",
-                    "xterm",
-                    env={**os.environ, "DISPLAY": self.display_name},
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-
-                stdout, stderr = await proc.communicate()
-
+                stdout, _ = await asyncio.wait_for(proc.communicate(), 2)
                 if proc.returncode == 0 and stdout.strip():
-                    window_ids = stdout.decode().strip().split("\n")
-                    if window_ids and window_ids[0]:
-                        self.window_id = window_ids[0]
-                        print(f"Found xterm window ID: {self.window_id}")
-                        return
-
-            except Exception as e:
-                if i % 10 == 0:  # Print debug info every second
-                    print(f"Waiting for xterm window... (attempt {i + 1}/50): {e}")
-
+                    self.window_id = stdout.decode().splitlines()[0]
+                    return
+            except asyncio.TimeoutError as e:
+                raise RuntimeError("Timed out finding the xterm window") from e
+            finally:
+                await terminate_process(proc)
             await asyncio.sleep(0.1)
-
         raise RuntimeError("Failed to find xterm window")
 
     async def _configure_window(self) -> None:
@@ -190,8 +181,32 @@ while :; do sleep 0.1; done
                 _, stderr = await asyncio.wait_for(proc.communicate(), 5)
                 if proc.returncode:
                     raise RuntimeError(f"{cmd[0]} failed: {stderr.decode(errors='replace')}")
+            except asyncio.TimeoutError as e:
+                raise RuntimeError(f"Timed out configuring the terminal with {cmd[0]}") from e
             finally:
                 await terminate_process(proc)
+
+        for _ in range(50):
+            proc = await asyncio.create_subprocess_exec(
+                "xdotool",
+                "getwindowgeometry",
+                "--shell",
+                self.window_id,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), 2)
+                fields = dict(line.split("=", 1) for line in stdout.decode().splitlines() if "=" in line)
+                if fields.get("WIDTH") == str(self.width) and fields.get("HEIGHT") == str(self.height):
+                    return
+            except asyncio.TimeoutError as e:
+                raise RuntimeError("Timed out reading terminal geometry") from e
+            finally:
+                await terminate_process(proc)
+            await asyncio.sleep(0.1)
+        raise RuntimeError("Terminal did not reach the requested pixel dimensions")
 
     async def wait_for_completion(self) -> int:
         """Wait for the terminal/command to complete and return exit code"""

@@ -6,6 +6,8 @@ import asyncio
 from pathlib import Path
 from typing import List, Optional
 
+from .processes import terminate_process
+
 
 class XServerInfo:
     """Information about an X server"""
@@ -113,7 +115,7 @@ async def test_display_connection(display_name: str) -> bool:
     try:
         await asyncio.wait_for(proc.wait(), timeout=2)
         return proc.returncode == 0
+    except asyncio.TimeoutError:
+        return False
     finally:
-        if proc.returncode is None:
-            proc.kill()
-            await proc.wait()
+        await terminate_process(proc)
