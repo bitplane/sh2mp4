@@ -148,7 +148,7 @@ def main() -> int:
         return check_dependencies()
 
     # Check dependencies before recording (silently)
-    missing = check_runtime_dependencies(cast_file_mode=bool(args.cast_file))
+    missing = check_runtime_dependencies()
     if missing:
         print(f"Error: Missing required dependencies: {', '.join(missing)}", file=sys.stderr)
         print("Run 'sh2mp4 --check-deps' for detailed information", file=sys.stderr)

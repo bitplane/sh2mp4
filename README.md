@@ -112,7 +112,7 @@ The main requirements are:
 * 🗔 xterm (terminal emulator)
 * 🪟 openbox (window manager)
 * ✖️ X11 utilities (wmctrl, xdotool, xprop, xdpyinfo, xset, unclutter)
-* asciinema, bash, and fontconfig
+* asciinema with `play --out-fmt asciicast` support, bash, coreutils, and fontconfig
 
 You might want to run this in a container due to the number of dependencies.
 
