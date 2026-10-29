@@ -79,13 +79,25 @@ async def record_command(args) -> int:
                     print("Recording... (waiting for command to complete)")
 
                     # Wait for command to complete
-                    exit_code = await terminal.wait_for_completion()
-                    await asyncio.sleep(0.5)
+                    command_task = asyncio.create_task(terminal.wait_for_completion())
+                    encoder_task = asyncio.create_task(recorder.wait_for_failure())
+                    try:
+                        done, _ = await asyncio.wait([command_task, encoder_task], return_when=asyncio.FIRST_COMPLETED)
+                        if encoder_task in done:
+                            await encoder_task
+                        exit_code = await command_task
+                        await asyncio.sleep(0.5)
+                    finally:
+                        for task in (command_task, encoder_task):
+                            task.cancel()
+                        await asyncio.gather(command_task, encoder_task, return_exceptions=True)
 
                     print("Command completed, stopping recording...")
 
                     # Stop recording
-                    await recorder.stop()
+                    encoder_status = await recorder.stop()
+                    if encoder_status != 0:
+                        raise RuntimeError(recorder.error_message(f"FFmpeg failed (status {encoder_status})"))
 
                     print(f"Recording complete: {args.output}")
                     return exit_code

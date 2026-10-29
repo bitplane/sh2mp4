@@ -8,9 +8,12 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from collections import deque
+from contextlib import suppress
 from typing import Optional
 
 from .ascii_preview import colored_blocks_preview
+from .processes import terminate_process
 
 
 class Recorder:
@@ -37,6 +40,10 @@ class Recorder:
         self.debug = debug
         self.ffmpeg_process: Optional[asyncio.subprocess.Process] = None
         self.watch_task: Optional[asyncio.Task] = None
+        self._stderr_task = None
+        self._progress_task = None
+        self._errors = deque(maxlen=16)
+        self._ready = asyncio.Event()
 
     async def start(self) -> None:
         """Start recording the display"""
@@ -59,6 +66,10 @@ class Recorder:
         cmd = [
             "ffmpeg",
             # Removed -nostdin to allow sending 'q' to stop recording
+            "-progress",
+            "pipe:1",
+            "-stats_period",
+            "0.05",
             "-nostats",  # Disable progress statistics
             "-hide_banner",  # Hide copyright banner
             "-loglevel",
@@ -77,7 +88,7 @@ class Recorder:
         # If recording at higher fps than output fps, add filter to slow down to real-time
         if self.recording_fps != self.fps:
             speed_factor = self.fps / self.recording_fps
-            cmd.extend(["-vf", f"setpts={1/speed_factor}*PTS", "-r", str(self.fps)])
+            cmd.extend(["-vf", f"setpts={1 / speed_factor}*PTS", "-r", str(self.fps)])
 
         cmd.extend(
             [
@@ -98,29 +109,58 @@ class Recorder:
 
         if self.debug:
             print(f"DEBUG: ffmpeg command: {' '.join(cmd)}", file=sys.stderr)
-            stderr_dest = None
-            stdout_dest = None
-        else:
-            stderr_dest = asyncio.subprocess.DEVNULL
-            stdout_dest = asyncio.subprocess.DEVNULL
-
         self.ffmpeg_process = await asyncio.create_subprocess_exec(
             *cmd,
             env=env,
             stdin=asyncio.subprocess.PIPE,  # Allow stdin for sending 'q' to stop
-            stdout=stdout_dest,
-            stderr=stderr_dest,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+
+        self._stderr_task = asyncio.create_task(self._read_errors())
+        self._progress_task = asyncio.create_task(self._read_progress())
+        ready = asyncio.create_task(self._ready.wait())
+        exited = asyncio.create_task(self.ffmpeg_process.wait())
+        try:
+            done, _ = await asyncio.wait([ready, exited], timeout=10, return_when=asyncio.FIRST_COMPLETED)
+            if exited in done or not done:
+                await self.stop()
+                raise RuntimeError(self.error_message("FFmpeg failed to start capturing"))
+        finally:
+            for task in (ready, exited):
+                task.cancel()
+            await asyncio.gather(ready, exited, return_exceptions=True)
 
         # Start watch task if requested
         if self.watch:
             self.watch_task = asyncio.create_task(self._watch_display())
+
+    async def _read_errors(self):
+        while chunk := await self.ffmpeg_process.stderr.read(4096):
+            self._errors.append(chunk)
+            if self.debug:
+                print(chunk.decode(errors="replace"), end="", file=sys.stderr)
+
+    async def _read_progress(self):
+        while line := await self.ffmpeg_process.stdout.readline():
+            if line.startswith(b"frame=") and int(line.split(b"=", 1)[1]) > 0:
+                self._ready.set()
+
+    def error_message(self, message):
+        details = b"".join(self._errors).decode(errors="replace").strip()
+        return f"{message}: {details}" if details else message
+
+    async def wait_for_failure(self):
+        code = await self.ffmpeg_process.wait()
+        await self._stderr_task
+        raise RuntimeError(self.error_message(f"FFmpeg exited before recording finished (status {code})"))
 
     async def _watch_display(self) -> None:
         """Show live preview of the display being recorded"""
         temp_dir = tempfile.mkdtemp(prefix="sh2mp4_watch_")
         screenshot_path = os.path.join(temp_dir, "watch.png")
 
+        screenshot_proc = None
         preview_lines = 0  # Track how many lines we printed
 
         try:
@@ -169,60 +209,38 @@ class Recorder:
 
                 await asyncio.sleep(0.5)  # Update every 500ms
 
-        except asyncio.CancelledError:
-            # Reset terminal attributes on cancellation
-            print("\033[0m", end="", file=sys.stderr)  # Reset all attributes
-
-            # Clean up temp directory
-            shutil.rmtree(temp_dir, ignore_errors=True)
-            raise
         finally:
-            # Always reset terminal attributes on exit
-            print("\033[0m", end="", file=sys.stderr)  # Reset all attributes
+            await terminate_process(screenshot_proc)
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            print("\033[0m", end="", file=sys.stderr)
 
     async def stop(self) -> int:
-        """Stop recording and return exit code"""
-        if not self.ffmpeg_process:
-            raise RuntimeError("Recording not started")
-
-        # Cancel watch task if running
-        if self.watch_task and not self.watch_task.done():
+        """Finalize the file and return the encoder status; safe to call repeatedly."""
+        if self.watch_task:
             self.watch_task.cancel()
+            await asyncio.gather(self.watch_task, return_exceptions=True)
+        process = self.ffmpeg_process
+        if process is None:
+            raise RuntimeError("Recording not started")
+        if process.returncode is None:
             try:
-                await self.watch_task
-            except asyncio.CancelledError:
-                pass
-
-        # Send 'q' to stdin to gracefully stop ffmpeg
-        if self.debug:
-            print("DEBUG: Sending 'q' to ffmpeg stdin...", file=sys.stderr)
+                process.stdin.write(b"q")
+                await process.stdin.drain()
+                process.stdin.close()
+            except (BrokenPipeError, ConnectionResetError):
+                with suppress(ProcessLookupError):
+                    process.terminate()
         try:
-            self.ffmpeg_process.stdin.write(b"q")
-            await self.ffmpeg_process.stdin.drain()
-            self.ffmpeg_process.stdin.close()
-        except Exception as e:
-            if self.debug:
-                print(f"DEBUG: Failed to send 'q': {e}", file=sys.stderr)
-            # Fall back to SIGTERM
-            self.ffmpeg_process.terminate()
-
-        try:
-            # Wait for ffmpeg to finish processing
-            if self.debug:
-                print("DEBUG: Waiting for ffmpeg to terminate...", file=sys.stderr)
-            return_code = await asyncio.wait_for(self.ffmpeg_process.wait(), timeout=5)
-            if self.debug:
-                print(f"DEBUG: ffmpeg terminated with code {return_code}", file=sys.stderr)
-            return return_code
+            await asyncio.wait_for(process.wait(), timeout=30)
         except asyncio.TimeoutError:
-            if self.debug:
-                print("DEBUG: ffmpeg timeout, force killing...", file=sys.stderr)
-            # Force kill if it doesn't stop gracefully
-            self.ffmpeg_process.kill()
-            return_code = await self.ffmpeg_process.wait()
-            if self.debug:
-                print(f"DEBUG: ffmpeg killed with code {return_code}", file=sys.stderr)
-            return return_code
+            await terminate_process(process)
+            raise RuntimeError(self.error_message("FFmpeg timed out finalizing the video"))
+        finally:
+            await asyncio.gather(
+                *(task for task in (self._stderr_task, self._progress_task) if task),
+                return_exceptions=True,
+            )
+        return process.returncode
 
     async def is_running(self) -> bool:
         """Check if recording is active"""
@@ -232,5 +250,5 @@ class Recorder:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.ffmpeg_process and self.ffmpeg_process.returncode is None:
+        if self.ffmpeg_process:
             await self.stop()
