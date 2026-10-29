@@ -4,6 +4,8 @@ Virtual display management using Xvfb
 
 import asyncio
 import os
+import pwd
+import secrets
 import shutil
 import tempfile
 from pathlib import Path
@@ -62,6 +64,12 @@ class DisplayManager:
 
     async def _start_xvfb(self, width: int, height: int) -> None:
         """Let Xvfb atomically allocate a display and report readiness."""
+        if self.temp_dir is None:
+            self.temp_dir = Path(tempfile.mkdtemp(prefix="sh2mp4_"))
+        authority = self.temp_dir / "Xauthority"
+        authority.touch(mode=0o600)
+        cookie = secrets.token_hex(16)
+        await self._authorize_display(authority, 0, cookie)
         read_fd, write_fd = os.pipe()
         reader = asyncio.StreamReader()
         protocol = asyncio.StreamReaderProtocol(reader)
@@ -75,6 +83,8 @@ class DisplayManager:
                 cmd.append(f":{self.display_num}")
             cmd.extend(
                 [
+                    "-auth",
+                    str(authority),
                     "-displayfd",
                     str(write_fd),
                     "-screen",
@@ -100,6 +110,21 @@ class DisplayManager:
                 raise RuntimeError("Xvfb failed to start its own display")
             self.display_num = int(line)
             self.display_name = f":{self.display_num}"
+            await self._authorize_display(authority, self.display_num, cookie)
+            # Permit only this Unix user; clients need no global XAUTHORITY mutation.
+            proc = await asyncio.create_subprocess_exec(
+                "xhost",
+                f"+si:localuser:{pwd.getpwuid(os.getuid()).pw_name}",
+                env={**os.environ, "DISPLAY": self.display_name, "XAUTHORITY": str(authority)},
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                _, error = await asyncio.wait_for(proc.communicate(), 5)
+                if proc.returncode:
+                    raise RuntimeError(f"Failed to restrict display access: {error.decode(errors='replace')}")
+            finally:
+                await terminate_process(proc)
             if not await self.is_ready():
                 raise RuntimeError("Xvfb display is not accessible")
             print(f"Using display {self.display_name}")
@@ -110,6 +135,26 @@ class DisplayManager:
                 os.close(write_fd)
             if transport is not None:
                 transport.close()
+
+    async def _authorize_display(self, authority, number, cookie):
+        proc = await asyncio.create_subprocess_exec(
+            "xauth",
+            "-f",
+            str(authority),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _, error = await asyncio.wait_for(
+                proc.communicate(f"add :{number} MIT-MAGIC-COOKIE-1 {cookie}\n".encode()), 5
+            )
+            if proc.returncode:
+                raise RuntimeError("Failed to create private X authorization")
+        except asyncio.TimeoutError as e:
+            raise RuntimeError("Timed out creating private X authorization") from e
+        finally:
+            await terminate_process(proc)
 
     async def _start_openbox(self) -> None:
         """Start the Openbox window manager"""

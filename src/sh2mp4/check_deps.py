@@ -32,6 +32,8 @@ def get_required_commands() -> list[str]:
         "xdotool",
         "wmctrl",
         "xprop",
+        "xauth",
+        "xhost",
         "xdpyinfo",
         "xset",
         "fc-list",

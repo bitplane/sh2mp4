@@ -150,3 +150,17 @@ async def test_empty_trim_is_an_error(tmp_path):
     recorder._content_end = 1001
     with pytest.raises(RuntimeError, match="encoding failed"):
         await recorder.encode()
+
+
+async def test_private_display_access_control():
+    import pwd
+    from sh2mp4.display import DisplayManager
+
+    async with DisplayManager() as display:
+        await display._start_xvfb(100, 100)
+        result = subprocess.run(
+            ["xhost"], env={**os.environ, "DISPLAY": display.display_name}, capture_output=True, text=True, check=True
+        )
+        assert "access control enabled" in result.stdout
+        assert f"SI:localuser:{pwd.getpwuid(os.getuid()).pw_name}" in result.stdout
+        assert "LOCAL:" not in result.stdout
