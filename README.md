@@ -105,7 +105,8 @@ The main requirements are:
 * 🖼️ Xvfb (virtual framebuffer)
 * 🗔 xterm (terminal emulator)
 * 🪟 openbox (window manager)
-* ✖️ Various X11 utilities (wmctrl, xdotool, unclutter)
+* ✖️ X11 utilities (wmctrl, xdotool, xprop, xdpyinfo, xset, unclutter)
+* asciinema, bash, fontconfig, and Python tkinter (system package `python3-tk`)
 
 You might want to run this in a container due to the number of dependencies.
 

@@ -48,20 +48,7 @@ async def is_display_in_use(display_num: int) -> bool:
     if socket_path.exists():
         return True
 
-    # Try to connect to see if something is listening
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "xdpyinfo",
-            "-display",
-            f":{display_num}",
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        await proc.wait()
-        return proc.returncode == 0
-    except FileNotFoundError:
-        # xdpyinfo not available, assume not in use
-        return False
+    return await test_display_connection(f":{display_num}")
 
 
 async def list_running_xservers() -> List[XServerInfo]:
@@ -116,27 +103,17 @@ async def get_newest_xserver() -> Optional[XServerInfo]:
 
 async def test_display_connection(display_name: str) -> bool:
     """Test if we can connect to a display"""
+    proc = await asyncio.create_subprocess_exec(
+        "xdpyinfo",
+        "-display",
+        display_name,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
     try:
-        proc = await asyncio.create_subprocess_exec(
-            "xdpyinfo", "-display", display_name, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
-        await proc.wait()
+        await asyncio.wait_for(proc.wait(), timeout=2)
         return proc.returncode == 0
-    except FileNotFoundError:
-        # xdpyinfo not available, try a different approach
-        try:
-            # Try to list windows
-            proc = await asyncio.create_subprocess_exec(
-                "xwininfo",
-                "-display",
-                display_name,
-                "-root",
-                "-tree",
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
+    finally:
+        if proc.returncode is None:
+            proc.kill()
             await proc.wait()
-            return proc.returncode == 0
-        except FileNotFoundError:
-            # No X11 tools available, assume it works
-            return True

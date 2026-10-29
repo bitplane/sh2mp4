@@ -3,6 +3,7 @@
 Check dependencies for sh2mp4
 """
 
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -36,10 +37,21 @@ def check_monospace_fonts() -> bool:
 
 def get_required_commands(cast_file_mode: bool = False) -> list[str]:
     """Get list of required commands based on mode"""
-    commands = ["xdotool", "wmctrl", "ffmpeg", "Xvfb", "openbox", "xterm", "unclutter"]
-
-    if cast_file_mode:
-        commands.append("asciinema")
+    commands = [
+        "bash",
+        "xdotool",
+        "wmctrl",
+        "xprop",
+        "xdpyinfo",
+        "xset",
+        "fc-list",
+        "ffmpeg",
+        "Xvfb",
+        "openbox",
+        "xterm",
+        "unclutter",
+        "asciinema",
+    ]
 
     return commands
 
@@ -47,7 +59,10 @@ def get_required_commands(cast_file_mode: bool = False) -> list[str]:
 def check_runtime_dependencies(cast_file_mode: bool = False) -> list[str]:
     """Check runtime dependencies and return list of missing commands"""
     required_commands = get_required_commands(cast_file_mode)
-    return [cmd for cmd in required_commands if not check_command(cmd)]
+    missing = [cmd for cmd in required_commands if not check_command(cmd)]
+    if importlib.util.find_spec("tkinter") is None:
+        missing.append("python3-tk")
+    return missing
 
 
 def main() -> int:
@@ -58,7 +73,7 @@ def main() -> int:
     required_commands = get_required_commands()
 
     # Optional commands (not required for core functionality)
-    optional_commands = ["asciinema"]
+    optional_commands = []
 
     missing_count = 0
 
@@ -77,6 +92,10 @@ def main() -> int:
                 print(f"✓ Found: {cmd} (optional)")
             else:
                 print(f"⚠️  Missing: {cmd} (optional)")
+
+    if importlib.util.find_spec("tkinter") is None:
+        print("❌ Missing tkinter (install python3-tk)")
+        missing_count += 1
 
     # Check locale
     if check_locale():

@@ -9,8 +9,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 
 dependencies = [
-    "Pillow>=9.0.0",
-    "pytk"
+    "Pillow>=9.1.0"
 ]
 
 [project.optional-dependencies]
