@@ -9,7 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from .xserver import find_available_display
+from .xserver import is_display_in_use, test_display_connection
+from .processes import terminate_process
 
 
 class DisplayManager:
@@ -25,44 +26,82 @@ class DisplayManager:
 
     async def start(self, width: int, height: int) -> None:
         """Start the virtual display and window manager"""
-        # Find available display if not specified
-        if self.display_num is None:
-            self.display_num = await find_available_display()
-
-        self.display_name = f":{self.display_num}"
-        print(f"Using display {self.display_name}")
-
-        # Create temporary directory for configs
+        if self.display_num is not None and await is_display_in_use(self.display_num):
+            raise RuntimeError(f"Display :{self.display_num} is already in use")
         self.temp_dir = Path(tempfile.mkdtemp(prefix="sh2mp4_"))
-
-        # Start Xvfb
         await self._start_xvfb(width, height)
-
-        # Wait a bit for Xvfb to initialize
-        await asyncio.sleep(1)
-
-        # Start window manager
         await self._start_openbox()
-
-        # Wait for window manager to initialize
-        await asyncio.sleep(1)
-
-        # Start unclutter to hide mouse cursor
+        for _ in range(100):
+            if self.openbox_process.returncode is not None:
+                raise RuntimeError("Openbox exited during startup")
+            proc = await asyncio.create_subprocess_exec(
+                "wmctrl",
+                "-m",
+                env={**os.environ, "DISPLAY": self.display_name},
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            try:
+                await asyncio.wait_for(proc.wait(), 2)
+            finally:
+                await terminate_process(proc)
+            if proc.returncode == 0:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            raise RuntimeError("Openbox did not become ready")
         await self._start_unclutter()
-
-        # Wait for unclutter to initialize
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
+        if self.unclutter_process.returncode is not None:
+            raise RuntimeError("Unclutter exited during startup")
 
     async def _start_xvfb(self, width: int, height: int) -> None:
-        """Start the Xvfb virtual display server"""
-        cmd = ["Xvfb", self.display_name, "-screen", "0", f"{width}x{height}x24", "+extension", "RANDR"]
-
-        self.xvfb_process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
-
-        # Set the DISPLAY environment variable
-        os.environ["DISPLAY"] = self.display_name
+        """Let Xvfb atomically allocate a display and report readiness."""
+        read_fd, write_fd = os.pipe()
+        reader = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(reader)
+        transport = None
+        try:
+            transport, _ = await asyncio.get_running_loop().connect_read_pipe(
+                lambda: protocol, os.fdopen(read_fd, "rb")
+            )
+            cmd = ["Xvfb"]
+            if self.display_num is not None:
+                cmd.append(f":{self.display_num}")
+            cmd.extend(
+                [
+                    "-displayfd",
+                    str(write_fd),
+                    "-screen",
+                    "0",
+                    f"{width}x{height}x24",
+                    "-nolisten",
+                    "tcp",
+                    "+extension",
+                    "RANDR",
+                ]
+            )
+            self.xvfb_process = await asyncio.create_subprocess_exec(
+                *cmd,
+                pass_fds=(write_fd,),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            os.close(write_fd)
+            write_fd = None
+            line = await asyncio.wait_for(reader.readline(), 10)
+            if not line.strip().isdigit() or self.xvfb_process.returncode is not None:
+                raise RuntimeError("Xvfb failed to start its own display")
+            self.display_num = int(line)
+            self.display_name = f":{self.display_num}"
+            if not await self.is_ready():
+                raise RuntimeError("Xvfb display is not accessible")
+            print(f"Using display {self.display_name}")
+        finally:
+            if write_fd is not None:
+                os.close(write_fd)
+            if transport is not None:
+                transport.close()
 
     async def _start_openbox(self) -> None:
         """Start the Openbox window manager"""
@@ -107,60 +146,27 @@ class DisplayManager:
 
     async def stop(self) -> None:
         """Stop the display and clean up"""
-        # Stop unclutter
-        if self.unclutter_process:
-            try:
-                self.unclutter_process.terminate()
-                await asyncio.wait_for(self.unclutter_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.unclutter_process.kill()
-                await self.unclutter_process.wait()
-
-        # Stop openbox
-        if self.openbox_process:
-            try:
-                self.openbox_process.terminate()
-                await asyncio.wait_for(self.openbox_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.openbox_process.kill()
-                await self.openbox_process.wait()
-
-        # Stop Xvfb
-        if self.xvfb_process:
-            try:
-                self.xvfb_process.terminate()
-                await asyncio.wait_for(self.xvfb_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.xvfb_process.kill()
-                await self.xvfb_process.wait()
-
-        # Clean up temp directory
-        if self.temp_dir and self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
-
-        # Clean DISPLAY env var
-        if "DISPLAY" in os.environ and os.environ["DISPLAY"] == self.display_name:
-            del os.environ["DISPLAY"]
+        try:
+            results = await asyncio.gather(
+                *(
+                    terminate_process(proc)
+                    for proc in (self.unclutter_process, self.openbox_process, self.xvfb_process)
+                ),
+                return_exceptions=True,
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+        finally:
+            if self.temp_dir and self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir)
 
     async def is_ready(self) -> bool:
-        """Check if the display is ready for use"""
+        """Check our server's lifetime as well as its connection."""
         if not self.xvfb_process or self.xvfb_process.returncode is not None:
             return False
-
-        # Try to connect to the display
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "xdpyinfo",
-                "-display",
-                self.display_name,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await proc.wait()
-            return proc.returncode == 0
-        except FileNotFoundError:
-            # xdpyinfo not available, assume it's working
-            return True
+        connected = await test_display_connection(self.display_name)
+        return connected and self.xvfb_process.returncode is None
 
     async def __aenter__(self):
         return self
