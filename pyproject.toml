@@ -1,7 +1,7 @@
 [project]
 name = "sh2mp4"
 description = "Records shell commands to MP4 videos"
-version = "0.3.6"
+version = "0.4.0"
 authors = [
     { name = "Gareth Davidson", email = "gaz@bitplane.net" }
 ]
