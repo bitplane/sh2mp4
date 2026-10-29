@@ -5,11 +5,13 @@ Terminal (xterm) management for command execution
 import asyncio
 import os
 import shutil
+import shlex
 import tempfile
 from pathlib import Path
 from typing import Optional
 
 from .themes import Theme
+from .processes import terminate_process
 
 
 class TerminalManager:
@@ -58,25 +60,17 @@ class TerminalManager:
         script_path = self.temp_dir / "command.sh"
         sync_file = self.temp_dir / "recorder_ready"
 
+        payload = self.temp_dir / "payload.sh"
+        payload.write_text(command + "\n")
         script_content = f"""#!/usr/bin/env bash
-set -euo pipefail
-
-# Wait for recorder to be ready
-while [ ! -f "{sync_file}" ]; do
-    sleep 0.1
+while [ ! -f {shlex.quote(str(sync_file))} ]; do
+    sleep 0.01
 done
-
-# Give recorder a moment to capture first frames
-sleep 0.5
-
-# Execute the command
-{command}
-
-# Give recorder a moment to capture output
-sleep 0.5
-
-# Exit when done
-exit 0
+bash {shlex.quote(str(payload))}
+status=$?
+# Keep both successful and failed output visible until the recorder stops.
+printf '%s' "$status" > {shlex.quote(str(self.temp_dir / "exit_status"))}
+while :; do sleep 0.1; done
 """
 
         script_path.write_text(script_content)
@@ -126,6 +120,8 @@ exit 0
     async def _wait_for_window(self) -> None:
         """Wait for the xterm window to appear"""
         for i in range(50):  # Try for up to 5 seconds
+            if self.xterm_process.returncode is not None:
+                raise RuntimeError("Xterm exited during startup")
             try:
                 # Find xterm window
                 proc = await asyncio.create_subprocess_exec(
@@ -150,7 +146,7 @@ exit 0
 
             except Exception as e:
                 if i % 10 == 0:  # Print debug info every second
-                    print(f"Waiting for xterm window... (attempt {i+1}/50): {e}")
+                    print(f"Waiting for xterm window... (attempt {i + 1}/50): {e}")
 
             await asyncio.sleep(0.1)
 
@@ -163,66 +159,48 @@ exit 0
 
         env = {**os.environ, "DISPLAY": self.display_name}
 
-        # Set window size and position
-        await asyncio.create_subprocess_exec(
-            "wmctrl",
-            "-ir",
-            self.window_id,
-            "-e",
-            f"0,0,0,{self.width},{self.height}",
-            env=env,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-
-        # Remove decorations
-        await asyncio.create_subprocess_exec(
-            "xprop",
-            "-id",
-            self.window_id,
-            "-f",
-            "_MOTIF_WM_HINTS",
-            "32c",
-            "-set",
-            "_MOTIF_WM_HINTS",
-            "0x2, 0x0, 0x0, 0x0, 0x0",
-            env=env,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-
-        # Remove window decorations (openbox)
-        await asyncio.create_subprocess_exec(
-            "wmctrl",
-            "-i",
-            "-r",
-            self.window_id,
-            "-b",
-            "add,undecorated",
-            env=env,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-
-        # Make fullscreen
-        await asyncio.create_subprocess_exec(
-            "wmctrl",
-            "-i",
-            "-r",
-            self.window_id,
-            "-b",
-            "add,fullscreen",
-            env=env,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
+        commands = [
+            [
+                "xprop",
+                "-id",
+                self.window_id,
+                "-f",
+                "_MOTIF_WM_HINTS",
+                "32c",
+                "-set",
+                "_MOTIF_WM_HINTS",
+                "0x2, 0x0, 0x0, 0x0, 0x0",
+            ],
+            ["wmctrl", "-ir", self.window_id, "-e", f"0,0,0,{self.width},{self.height}"],
+            ["wmctrl", "-ir", self.window_id, "-b", "add,fullscreen"],
+        ]
+        for cmd in commands:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                env=env,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                _, stderr = await asyncio.wait_for(proc.communicate(), 5)
+                if proc.returncode:
+                    raise RuntimeError(f"{cmd[0]} failed: {stderr.decode(errors='replace')}")
+            finally:
+                await terminate_process(proc)
 
     async def wait_for_completion(self) -> int:
         """Wait for the terminal/command to complete and return exit code"""
         if not self.xterm_process:
             raise RuntimeError("Terminal not started")
 
-        return await self.xterm_process.wait()
+        status_file = self.temp_dir / "exit_status"
+        while self.xterm_process.returncode is None:
+            if status_file.exists():
+                status = status_file.read_text().strip()
+                if status:
+                    return int(status)
+            await asyncio.sleep(0.01)
+        raise RuntimeError(f"Xterm exited before reporting command status ({self.xterm_process.returncode})")
 
     async def is_running(self) -> bool:
         """Check if the terminal is still running"""
@@ -230,17 +208,11 @@ exit 0
 
     async def stop(self) -> None:
         """Stop the terminal and clean up"""
-        if self.xterm_process and self.xterm_process.returncode is None:
-            try:
-                self.xterm_process.terminate()
-                await asyncio.wait_for(self.xterm_process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.xterm_process.kill()
-                await self.xterm_process.wait()
-
-        # Clean up temp directory
-        if self.temp_dir and self.temp_dir.exists():
-            shutil.rmtree(self.temp_dir)
+        try:
+            await terminate_process(self.xterm_process)
+        finally:
+            if self.temp_dir and self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir)
 
     async def __aenter__(self):
         return self

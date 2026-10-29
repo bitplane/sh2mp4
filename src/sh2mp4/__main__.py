@@ -80,6 +80,7 @@ async def record_command(args) -> int:
 
                     # Wait for command to complete
                     exit_code = await terminal.wait_for_completion()
+                    await asyncio.sleep(0.5)
 
                     print("Command completed, stopping recording...")
 
