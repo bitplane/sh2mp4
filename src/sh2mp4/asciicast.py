@@ -58,15 +58,18 @@ def _parse_cast_header(cast_file: Path) -> tuple[int, int]:
             header_line = f.readline().strip()
             header = json.loads(header_line)
 
+            if not isinstance(header, dict) or header.get("version") != 2:
+                raise ValueError("Only asciicast version 2 is supported")
+
             width = header.get("width")
             height = header.get("height")
 
-            if width is None or height is None:
-                raise ValueError("Cast file missing width/height")
+            if any(type(value) is not int or value <= 0 for value in (width, height)):
+                raise ValueError("Cast width and height must be positive integers")
 
             return width, height
 
-    except (json.JSONDecodeError, FileNotFoundError, ValueError) as e:
+    except (json.JSONDecodeError, OSError, ValueError) as e:
         raise ValueError(f"Failed to parse cast file header: {e}")
 
 
@@ -88,10 +91,10 @@ def _find_max_cast_dimensions(cast_file: Path) -> tuple[int, int]:
                 try:
                     event = json.loads(line)
                     # Check if this is a resize event (type "r")
-                    if len(event) >= 3 and event[1] == "r":
+                    if isinstance(event, list) and len(event) >= 3 and event[1] == "r":
                         # Asciinema resize format: [timestamp, "r", "WIDTHxHEIGHT"]
                         resize_data = event[2]
-                        if "x" in resize_data:
+                        if isinstance(resize_data, str) and "x" in resize_data:
                             try:
                                 width_str, height_str = resize_data.split("x", 1)
                                 width = int(width_str)

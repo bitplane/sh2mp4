@@ -215,3 +215,25 @@ class TestOutputFilenamePreservation:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+@pytest.mark.parametrize("flag", ["--fps", "--cols", "--lines", "--font-size"])
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_positive_settings(flag, value):
+    with pytest.raises(SystemExit):
+        parse_and_validate_args(["true", flag, value])
+
+
+def test_equals_dimensions(tmp_path):
+    cast = tmp_path / "test.cast"
+    cast.write_text('{"version":2,"width":80,"height":24}\n')
+    args = parse_and_validate_args(["--cast-file", str(cast), "--cols=120", "--lines=40"])
+    assert (args.cols, args.lines) == (120, 40)
+
+
+@pytest.mark.parametrize("width", [0, -1, "80", True, None])
+def test_invalid_cast_dimensions(tmp_path, width):
+    cast = tmp_path / "test.cast"
+    cast.write_text(json.dumps({"version": 2, "width": width, "height": 24}))
+    with pytest.raises(SystemExit):
+        parse_and_validate_args(["--cast-file", str(cast)])

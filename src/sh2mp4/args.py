@@ -3,7 +3,7 @@ Argument parsing for sh2mp4
 """
 
 import argparse
-import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -12,13 +12,28 @@ from .asciicast import get_cast_config
 from .themes import list_themes
 
 
+def positive_int(value: str) -> int:
+    result = int(value)
+    if result <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return result
+
+
+def display_number(value: str) -> int:
+    result = int(value)
+    if result < 0:
+        raise argparse.ArgumentTypeError("must be nonnegative")
+    return result
+
+
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command line arguments - simple and straightforward"""
     parser = argparse.ArgumentParser(
         description="Record shell commands to MP4 videos",
+        allow_abbrev=False,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
-Available themes: {', '.join(list_themes())}
+Available themes: {", ".join(list_themes())}
 
 Examples:
   sh2mp4 "ls -la" demo.mp4
@@ -41,29 +56,29 @@ Examples:
     # Terminal dimensions
     parser.add_argument(
         "--cols",
-        type=int,
-        default=int(os.popen("tput cols 2>/dev/null || echo 80").read().strip()),
+        type=positive_int,
+        default=None,
         help="Terminal width in characters",
     )
     parser.add_argument(
         "--lines",
-        type=int,
-        default=int(os.popen("tput lines 2>/dev/null || echo 24").read().strip()),
+        type=positive_int,
+        default=None,
         help="Terminal height in characters",
     )
 
     # Video settings
-    parser.add_argument("--fps", type=int, default=30, help="Frames per second")
+    parser.add_argument("--fps", type=positive_int, default=30, help="Frames per second")
 
     # Font settings
     parser.add_argument("--font", default="DejaVu Sans Mono", help="Font family")
-    parser.add_argument("--font-size", type=int, default=12, help="Font size in points")
+    parser.add_argument("--font-size", type=positive_int, default=12, help="Font size in points")
 
     # Theme
     parser.add_argument("--theme", default="sh2mp4", choices=list_themes(), help="Color theme")
 
     # Display
-    parser.add_argument("--display", type=int, help="X display number (auto-allocate if not specified)")
+    parser.add_argument("--display", type=display_number, help="X display number (auto-allocate if not specified)")
 
     # Options
     parser.add_argument("--watch", action="store_true", help="Show live preview during recording")
@@ -79,8 +94,8 @@ Examples:
     args = parser.parse_args(argv)
 
     # Check if cols/lines were explicitly provided by user
-    user_provided_cols = "--cols" in (argv or sys.argv)
-    user_provided_lines = "--lines" in (argv or sys.argv)
+    user_provided_cols = args.cols is not None
+    user_provided_lines = args.lines is not None
 
     # Process arguments to get them into "ready to execute" state
     if args.cast_file:
@@ -126,6 +141,11 @@ Examples:
         # Utility modes
         args.recording_fps = args.fps
 
+    size = shutil.get_terminal_size(fallback=(80, 24))
+    if args.cols is None:
+        args.cols = size.columns
+    if args.lines is None:
+        args.lines = size.lines
     return args
 
 
