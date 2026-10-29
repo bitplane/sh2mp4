@@ -33,7 +33,10 @@ class DisplayManager:
         await self._start_openbox()
         for _ in range(100):
             if self.openbox_process.returncode is not None:
-                raise RuntimeError("Openbox exited during startup")
+                raise RuntimeError(
+                    f"Openbox exited during startup ({self.openbox_process.returncode}): "
+                    + (self.temp_dir / "openbox.log").read_text()
+                )
             proc = await asyncio.create_subprocess_exec(
                 "wmctrl",
                 "-m",
@@ -75,6 +78,7 @@ class DisplayManager:
                     "-screen",
                     "0",
                     f"{width}x{height}x24",
+                    "-noreset",
                     "-nolisten",
                     "tcp",
                     "+extension",
@@ -129,9 +133,8 @@ class DisplayManager:
         env = os.environ.copy()
         env["DISPLAY"] = self.display_name
 
-        self.openbox_process = await asyncio.create_subprocess_exec(
-            *cmd, env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
+        with (self.temp_dir / "openbox.log").open("wb") as log:
+            self.openbox_process = await asyncio.create_subprocess_exec(*cmd, env=env, stdout=log, stderr=log)
 
     async def _start_unclutter(self) -> None:
         """Start unclutter to hide the mouse cursor"""
