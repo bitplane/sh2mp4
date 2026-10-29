@@ -46,3 +46,27 @@ def test_bad_output_is_not_success(tmp_path):
     result = run("true", str(tmp_path / "missing" / "output.mp4"))
     assert result.returncode == 1
     assert "Recording complete:" not in result.stdout
+
+
+def test_sigterm_cleans_up_capture(tmp_path):
+    output = tmp_path / "interrupted.mp4"
+    process = subprocess.Popen(
+        [sys.executable, "-u", "-m", "sh2mp4", "sleep 60", str(output)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        for line in process.stdout:
+            if "waiting for command" in line:
+                break
+        else:
+            pytest.fail(process.stderr.read())
+        process.terminate()
+        _, stderr = process.communicate(timeout=15)
+        assert process.returncode == 143, stderr
+        assert not list(tmp_path.glob(".sh2mp4-*"))
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait()

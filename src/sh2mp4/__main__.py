@@ -4,6 +4,7 @@ Main entry point for sh2mp4
 
 import asyncio
 import sys
+import signal
 from pathlib import Path
 
 from .display import DisplayManager
@@ -113,6 +114,31 @@ async def record_command(args) -> int:
         return 1
 
 
+async def run_recording(args):
+    """Route termination signals through the same cleanup as cancellation."""
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    received = None
+
+    def cancel(signum):
+        nonlocal received
+        if received is None:
+            received = signum
+            task.cancel()
+
+    for signum in (signal.SIGTERM, signal.SIGHUP):
+        loop.add_signal_handler(signum, cancel, signum)
+    try:
+        return await record_command(args)
+    except asyncio.CancelledError:
+        if received is not None:
+            return 128 + received
+        raise
+    finally:
+        for signum in (signal.SIGTERM, signal.SIGHUP):
+            loop.remove_signal_handler(signum)
+
+
 def main() -> int:
     """Main entry point"""
     args = parse_and_validate_args()
@@ -138,7 +164,7 @@ def main() -> int:
 
     # Run the async recording function
     try:
-        return asyncio.run(record_command(args))
+        return asyncio.run(run_recording(args))
     except KeyboardInterrupt:
         return 130
 

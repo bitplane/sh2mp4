@@ -17,3 +17,8 @@ async def terminate_process(process, timeout=5):
         with suppress(ProcessLookupError):
             process.kill()
         await process.wait()
+    except BaseException:
+        with suppress(ProcessLookupError):
+            process.kill()
+        await asyncio.shield(process.wait())
+        raise
