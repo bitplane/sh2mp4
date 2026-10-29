@@ -5,13 +5,6 @@ Font handling and character dimension calculation
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-try:
-    import tkinter as tk
-    from tkinter import font as tkfont
-except ImportError:
-    tk = None
-    tkfont = None
-
 
 @dataclass
 class FontMetrics:
@@ -36,33 +29,28 @@ DEJAVU_SANS_MONO_METRICS = {
 }
 
 
-def get_font_metrics(font_name: str, font_size: int) -> FontMetrics:
+def get_font_metrics(font_name: str, font_size: int, display_name=None) -> FontMetrics:
     """
     Get character dimensions for a font and size.
-    Falls back to pre-measured values for DejaVu Sans Mono.
+    Uses pre-measured values for the default font; otherwise measures on the supplied display.
     """
     # Use pre-measured values for DejaVu Sans Mono
     if font_name == "DejaVu Sans Mono" and font_size in DEJAVU_SANS_MONO_METRICS:
         return DEJAVU_SANS_MONO_METRICS[font_size]
 
-    # Try to measure dynamically
-    try:
-        return measure_font(font_name, font_size)
-    except Exception:
-        # Fall back to size 12 DejaVu Sans Mono metrics
-        return DEJAVU_SANS_MONO_METRICS.get(12, FontMetrics(10, 19))
+    return measure_font(font_name, font_size, display_name)
 
 
-def measure_font(font_name: str, font_size: int) -> FontMetrics:
+def measure_font(font_name: str, font_size: int, display_name=None) -> FontMetrics:
     """Dynamically measure font character dimensions using tkinter"""
-    if tk is None or tkfont is None:
-        raise ImportError("tkinter is not available")
+    import tkinter as tk
+    from tkinter import font as tkfont
 
-    root = tk.Tk()
+    root = tk.Tk(screenName=display_name)
     root.withdraw()  # Hide the main window
 
     try:
-        font = tkfont.Font(family=font_name, size=font_size)
+        font = tkfont.Font(root=root, family=font_name, size=font_size)
         width = font.measure("M")  # Width of capital M
         height = font.metrics("linespace")  # Line height
         return FontMetrics(width, height)
@@ -70,7 +58,7 @@ def measure_font(font_name: str, font_size: int) -> FontMetrics:
         root.destroy()
 
 
-def measure_all_fonts() -> Dict[str, Dict[int, FontMetrics]]:
+def measure_all_fonts(display_name=None) -> Dict[str, Dict[int, FontMetrics]]:
     """Measure all common monospace fonts at various sizes"""
     fonts = [
         "Monospace",
@@ -89,7 +77,7 @@ def measure_all_fonts() -> Dict[str, Dict[int, FontMetrics]]:
         results[font_name] = {}
         for size in sizes:
             try:
-                metrics = measure_font(font_name, size)
+                metrics = measure_font(font_name, size, display_name)
                 results[font_name][size] = metrics
             except Exception:
                 continue
@@ -97,9 +85,11 @@ def measure_all_fonts() -> Dict[str, Dict[int, FontMetrics]]:
     return results
 
 
-def calculate_window_dimensions(cols: int, lines: int, font_name: str, font_size: int) -> Tuple[int, int]:
+def calculate_window_dimensions(
+    cols: int, lines: int, font_name: str, font_size: int, display_name=None
+) -> Tuple[int, int]:
     """Calculate pixel dimensions for terminal window with padding for xterm margins"""
-    metrics = get_font_metrics(font_name, font_size)
+    metrics = get_font_metrics(font_name, font_size, display_name)
 
     width = cols * metrics.width
     height = lines * metrics.height

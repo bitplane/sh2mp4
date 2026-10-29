@@ -24,7 +24,15 @@ async def record_command(args) -> int:
         print(f"Cast file dimensions: {args.cols}x{args.lines} characters (optimized)")
 
     # Calculate window dimensions
-    width, height = calculate_window_dimensions(args.cols, args.lines, args.font, args.font_size)
+    try:
+        async with DisplayManager() as measurement_display:
+            await measurement_display._start_xvfb(640, 480)
+            width, height = calculate_window_dimensions(
+                args.cols, args.lines, args.font, args.font_size, measurement_display.display_name
+            )
+    except Exception as e:
+        print(f"Error measuring font: {e}", file=sys.stderr)
+        return 1
 
     print(f"Recording: {args.command}")
 

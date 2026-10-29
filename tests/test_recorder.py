@@ -19,6 +19,7 @@ async def test_encoder_failure_is_not_success(monkeypatch, capsys):
 
     display = MagicMock(display_name=":99")
     display.start = AsyncMock()
+    display._start_xvfb = AsyncMock()
     display.__aenter__ = AsyncMock(return_value=display)
     display.__aexit__ = AsyncMock(return_value=False)
     terminal = MagicMock()
