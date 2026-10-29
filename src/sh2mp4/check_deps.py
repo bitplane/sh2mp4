@@ -3,7 +3,6 @@
 Check dependencies for sh2mp4
 """
 
-import importlib.util
 import shutil
 import subprocess
 import sys
@@ -60,8 +59,6 @@ def check_runtime_dependencies(cast_file_mode: bool = False) -> list[str]:
     """Check runtime dependencies and return list of missing commands"""
     required_commands = get_required_commands(cast_file_mode)
     missing = [cmd for cmd in required_commands if not check_command(cmd)]
-    if importlib.util.find_spec("tkinter") is None:
-        missing.append("python3-tk")
     return missing
 
 
@@ -92,10 +89,6 @@ def main() -> int:
                 print(f"✓ Found: {cmd} (optional)")
             else:
                 print(f"⚠️  Missing: {cmd} (optional)")
-
-    if importlib.util.find_spec("tkinter") is None:
-        print("❌ Missing tkinter (install python3-tk)")
-        missing_count += 1
 
     # Check locale
     if check_locale():

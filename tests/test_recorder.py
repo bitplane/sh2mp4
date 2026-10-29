@@ -38,6 +38,7 @@ async def test_encoder_failure_is_not_success(monkeypatch, capsys):
     recorder.error_message = lambda message: message
     recorder.__aenter__ = AsyncMock(return_value=recorder)
     recorder.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(main, "calculate_window_dimensions", lambda *a: (800, 480))
     monkeypatch.setattr(main, "DisplayManager", lambda *a: display)
     monkeypatch.setattr(main, "TerminalManager", lambda *a: terminal)
     monkeypatch.setattr(main, "Recorder", lambda *a, **kw: recorder)

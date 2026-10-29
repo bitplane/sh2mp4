@@ -147,20 +147,15 @@ def main() -> int:
     if args.check_deps:
         return check_dependencies()
 
-    if args.measure_fonts:
-        # Run measure fonts with no arguments (measures all fonts)
-        original_argv = sys.argv
-        sys.argv = [sys.argv[0]]  # Remove all arguments
-        result = measure_fonts()
-        sys.argv = original_argv
-        return result
-
     # Check dependencies before recording (silently)
     missing = check_runtime_dependencies(cast_file_mode=bool(args.cast_file))
     if missing:
         print(f"Error: Missing required dependencies: {', '.join(missing)}", file=sys.stderr)
         print("Run 'sh2mp4 --check-deps' for detailed information", file=sys.stderr)
         return 1
+
+    if args.measure_fonts:
+        return measure_fonts([])
 
     # Run the async recording function
     try:

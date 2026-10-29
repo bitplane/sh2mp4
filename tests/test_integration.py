@@ -101,3 +101,24 @@ def test_sigterm_cleans_up_capture(tmp_path):
         if process.poll() is None:
             process.kill()
         process.wait()
+
+
+@pytest.mark.parametrize("font,size", [("DejaVu Sans Mono", 12), ("Liberation Mono", 20)])
+def test_actual_terminal_grid(tmp_path, font, size):
+    import shlex
+
+    grid = tmp_path / "grid.txt"
+    result = run(
+        f"stty size > {shlex.quote(str(grid))}",
+        str(tmp_path / "grid.mp4"),
+        "--font",
+        font,
+        "--font-size",
+        str(size),
+        "--cols",
+        "81",
+        "--lines",
+        "25",
+    )
+    assert result.returncode == 0, result.stderr
+    assert grid.read_text().strip() == "25 81"

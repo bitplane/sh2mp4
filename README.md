@@ -61,7 +61,7 @@ $ sh2mp4 --measure-fonts
 ## Fonts
 
 Font size is configurable (default 12pt). Character dimensions are automatically
-calculated based on the font size. Supported sizes: 4, 6, 8, 10, 12, 14, 16, 18,
+measured from xterm on an owned virtual display. Supported sizes: 4, 6, 8, 10, 12, 14, 16, 18,
 20.
 
 Run `sh2mp4 --measure-fonts` to see pixel dimensions for all available fonts and
@@ -112,7 +112,7 @@ The main requirements are:
 * 🗔 xterm (terminal emulator)
 * 🪟 openbox (window manager)
 * ✖️ X11 utilities (wmctrl, xdotool, xprop, xdpyinfo, xset, unclutter)
-* asciinema, bash, fontconfig, and Python tkinter (system package `python3-tk`)
+* asciinema, bash, and fontconfig
 
 You might want to run this in a container due to the number of dependencies.
 

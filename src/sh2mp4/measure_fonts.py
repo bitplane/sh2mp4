@@ -3,13 +3,15 @@ Font measurement utility for sh2mp4
 """
 
 import argparse
+import asyncio
 import sys
 
 from . import __version__
 from .fonts import measure_all_fonts, measure_font
+from .display import DisplayManager
 
 
-def main() -> int:
+def main(argv=None) -> int:
     """Main entry point for measure-fonts command"""
     parser = argparse.ArgumentParser(
         description="Measure character dimensions of monospace fonts",
@@ -29,36 +31,26 @@ Examples:
     parser.add_argument("--size", type=int, help="Measure specific size only")
     parser.add_argument("--version", action="version", version=f"sh2mp4-measure-fonts {__version__}")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    try:
-        if args.font and args.size:
-            # Measure specific font and size
-            metrics = measure_font(args.font, args.size)
-            print(f"{args.font} {args.size} {metrics.width}x{metrics.height}")
-
-        elif args.font:
-            # Measure specific font at all sizes
-            sizes = [4, 6, 8, 10, 12, 14, 16, 18, 20]
-            for size in sizes:
-                try:
-                    metrics = measure_font(args.font, size)
-                    print(f"{args.font} {size} {metrics.width}x{metrics.height}")
-                except Exception:
-                    continue
-
-        else:
-            # Measure all fonts
-            results = measure_all_fonts()
-
-            for font_name, sizes in results.items():
+    async def measure():
+        async with DisplayManager() as display:
+            await display._start_xvfb(640, 480)
+            if args.font:
+                sizes = [args.size] if args.size else [4, 6, 8, 10, 12, 14, 16, 18, 20]
+                results = {args.font: {size: measure_font(args.font, size, display.display_name) for size in sizes}}
+            else:
+                results = measure_all_fonts(display.display_name)
+            for name, sizes in results.items():
                 for size, metrics in sizes.items():
-                    print(f"{font_name} {size} {metrics.width}x{metrics.height}")
-
+                    if args.size is None or size == args.size:
+                        print(f"{name} {size} {metrics.width}x{metrics.height}")
         return 0
 
+    try:
+        return asyncio.run(measure())
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error measuring fonts: {e}", file=sys.stderr)
         return 1
 
 
