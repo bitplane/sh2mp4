@@ -4,7 +4,6 @@ Virtual display management using Xvfb
 
 import asyncio
 import os
-import pwd
 import secrets
 import shutil
 import tempfile
@@ -114,7 +113,7 @@ class DisplayManager:
             # Permit only this Unix user; clients need no global XAUTHORITY mutation.
             proc = await asyncio.create_subprocess_exec(
                 "xhost",
-                f"+si:localuser:{pwd.getpwuid(os.getuid()).pw_name}",
+                f"+si:localuser:#{os.getuid()}",
                 env={**os.environ, "DISPLAY": self.display_name, "XAUTHORITY": str(authority)},
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
