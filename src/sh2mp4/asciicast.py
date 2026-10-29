@@ -3,6 +3,7 @@ Asciinema cast file handling and optimization
 """
 
 import json
+import math
 import shlex
 from pathlib import Path
 from typing import NamedTuple
@@ -16,6 +17,7 @@ class CastConfig(NamedTuple):
     command: str
     playback_speed: float = 1.0
     recording_fps: int = 30
+    duration: float = 0.0
 
 
 def get_cast_dimensions(cast_file: Path) -> tuple[int, int]:
@@ -45,9 +47,28 @@ def get_cast_config(cast_file: Path, playback_speed: float = 1.0, base_fps: int 
     cols, lines = get_cast_dimensions(cast_file)
     command = get_cast_command(cast_file, playback_speed)
     recording_fps = int(base_fps * playback_speed)
+    duration = 0.0
+    with cast_file.open() as stream:
+        next(stream)
+        for line in stream:
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+                timestamp = event[0]
+                if type(timestamp) not in (int, float) or not math.isfinite(timestamp) or timestamp < duration:
+                    raise ValueError("Cast event timestamps must be finite, nonnegative and ordered")
+                duration = timestamp
+            except (json.JSONDecodeError, IndexError, KeyError, TypeError) as e:
+                raise ValueError("Invalid cast event") from e
 
     return CastConfig(
-        cols=cols, lines=lines, command=command, playback_speed=playback_speed, recording_fps=recording_fps
+        cols=cols,
+        lines=lines,
+        command=command,
+        playback_speed=playback_speed,
+        recording_fps=recording_fps,
+        duration=duration,
     )
 
 

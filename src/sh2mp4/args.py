@@ -123,6 +123,7 @@ Examples:
             if not user_provided_lines:
                 args.lines = cast_config.lines
             args.recording_fps = cast_config.recording_fps
+            args.cast_duration = cast_config.duration
 
         except ValueError as e:
             parser.error(str(e))

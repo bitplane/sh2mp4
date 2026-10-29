@@ -84,12 +84,14 @@ The `--speed` option accelerates cast file conversion without affecting the fina
 playback timing (idle pauses are preserved):
 
 * ⏩ Asciinema plays the cast file at accelerated speed (`--speed 8x`)
-* 🔥 FFmpeg records at higher frame rate (8x normal fps)
-* 🧙 Video is automatically slowed back down to real-time during encoding
+* 🔥 FFmpeg captures at a higher frame rate (8x normal fps) into a lossless temporary file
+* 🧙 Encoding trims playback boundaries and restores real-time video timing
 
 Recording starts after the terminal is configured and the encoder is capturing.
 A short final hold preserves the last screen; its target video duration is 0.5 seconds
-at every conversion speed. Capture and process scheduling can add a small timing overhead.
+at every conversion speed. Frame rounding and process scheduling can add a small timing difference.
+Temporary captures are stored beside the output and removed on completion or failure;
+allow space for a lossless recording in that directory.
 
 The cast file is also scanned for the maximum terminal dimensions, to prevent
 text wrapping.

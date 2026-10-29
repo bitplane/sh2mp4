@@ -7,6 +7,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 from pathlib import Path
 from collections import deque
 from contextlib import suppress
@@ -44,6 +45,9 @@ class Recorder:
         self._progress_task = None
         self._errors = deque(maxlen=16)
         self._ready = asyncio.Event()
+        self._capture_path = None
+        self._content_start = None
+        self._content_end = None
 
     async def start(self) -> None:
         """Start recording the display"""
@@ -63,6 +67,11 @@ class Recorder:
             else:
                 print(f"DEBUG: X11 connection to {self.display_name} OK", file=sys.stderr)
 
+        # Keep potentially large captures alongside the requested output, never in /tmp.
+        fd, path = tempfile.mkstemp(prefix=".sh2mp4-", suffix=".mkv", dir=self.output_path.absolute().parent)
+        os.close(fd)
+        self._capture_path = Path(path)
+
         cmd = [
             "ffmpeg",
             # Removed -nostdin to allow sending 'q' to stop recording
@@ -75,6 +84,11 @@ class Recorder:
             "-loglevel",
             "error" if not self.debug else "info",  # Show more info in debug mode
             "-y",  # Overwrite output file
+            "-copyts",
+            "-probesize",
+            "32",
+            "-analyzeduration",
+            "0",
             "-f",
             "x11grab",
             "-framerate",
@@ -85,24 +99,8 @@ class Recorder:
             self.display_name,
         ]
 
-        # If recording at higher fps than output fps, add filter to slow down to real-time
-        if self.recording_fps != self.fps:
-            speed_factor = self.fps / self.recording_fps
-            cmd.extend(["-vf", f"setpts={1 / speed_factor}*PTS", "-r", str(self.fps)])
-
-        cmd.extend(
-            [
-                "-c:v",
-                "libx264",
-                "-preset",
-                "medium",
-                "-crf",
-                "18",
-                "-pix_fmt",
-                "yuv420p",
-                str(self.output_path),
-            ]
-        )
+        # Preserve wall-clock X11 timestamps for precise boundary trimming.
+        cmd.extend(["-c:v", "ffv1", "-level", "3", "-pix_fmt", "bgr0", str(self._capture_path)])
 
         env = os.environ.copy()
         env["DISPLAY"] = self.display_name
@@ -134,6 +132,55 @@ class Recorder:
         # Start watch task if requested
         if self.watch:
             self.watch_task = asyncio.create_task(self._watch_display())
+
+    def begin_content(self):
+        self._content_start = time.time()
+
+    def end_content(self, cast_duration=None):
+        end = time.time()
+        speed = self.recording_fps / self.fps
+        if cast_duration is not None:
+            # Playback ends at the cast's last event. Exclude player startup/import time.
+            self._content_start = end - cast_duration / speed
+        self._content_end = end + 0.5 / speed
+
+    async def encode(self):
+        if self._content_start is None or self._content_end is None:
+            raise RuntimeError("Recording boundaries were not set")
+        speed = self.recording_fps / self.fps
+        filters = f"trim=start={self._content_start}:end={self._content_end},setpts={speed}*(PTS-STARTPTS)"
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-copyts",
+            "-i",
+            str(self._capture_path),
+            "-vf",
+            filters,
+            "-r",
+            str(self.fps),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            str(self.output_path.absolute()),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _, stderr = await process.communicate()
+            if process.returncode:
+                raise RuntimeError(f"FFmpeg encoding failed: {stderr.decode(errors='replace').strip()}")
+        finally:
+            await terminate_process(process)
 
     async def _read_errors(self):
         while chunk := await self.ffmpeg_process.stderr.read(4096):
@@ -250,5 +297,9 @@ class Recorder:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.ffmpeg_process:
-            await self.stop()
+        try:
+            if self.ffmpeg_process:
+                await self.stop()
+        finally:
+            if self._capture_path:
+                self._capture_path.unlink(missing_ok=True)
