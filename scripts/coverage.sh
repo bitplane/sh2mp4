@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -uo pipefail
 source .venv/bin/activate
 
 package_name=$(echo "$1" | tr '-' '_')
@@ -10,6 +11,9 @@ pytest --cov="src/$package_name"    \
        --cov-report=html            \
        --cov-report=term-missing    \
        --cov-context=test . 2>&1    | tee htmlcov/coverage_report.txt
+status=$?
 
 # Extract just the missing coverage summary
 grep -A 20 "Missing" htmlcov/coverage_report.txt > htmlcov/missing_coverage.txt || true
+
+exit "$status"
