@@ -50,7 +50,7 @@ class TerminalManager:
         # Create command script
         if cast_mode:
             renderer = shlex.join([sys.executable, "-m", "sh2mp4.cast_output", str(self.temp_dir / "playback.json")])
-            command = f"{command} --out-fmt asciicast | {renderer}"
+            command = f"set -o pipefail; {command} --out-fmt asciicast | {renderer}"
         command_script = self._create_command_script(command)
 
         # Start xterm
@@ -71,7 +71,7 @@ class TerminalManager:
 while [ ! -f {shlex.quote(str(sync_file))} ]; do
     sleep 0.01
 done
-bash -o pipefail {shlex.quote(str(payload))}
+bash {shlex.quote(str(payload))}
 status=$?
 # Keep both successful and failed output visible until the recorder stops.
 printf '%s' "$status" > {shlex.quote(str(self.temp_dir / "exit_status"))}
