@@ -49,7 +49,14 @@ class TerminalManager:
 
         # Create command script
         if cast_mode:
-            renderer = shlex.join([sys.executable, "-m", "sh2mp4.cast_output", str(self.temp_dir / "playback.json")])
+            renderer = shlex.join(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("cast_output.py")),
+                    str(self.temp_dir / "playback.json"),
+                ]
+            )
             command = f"set -o pipefail; {command} --out-fmt asciicast | {renderer}"
         command_script = self._create_command_script(command)
 

@@ -29,6 +29,7 @@ def render(stream, output, timing_path):
 
 
 def main():
+    sys.stdout.reconfigure(errors="replace")
     render(iter(sys.stdin), sys.stdout, Path(sys.argv[1]))
 
 
