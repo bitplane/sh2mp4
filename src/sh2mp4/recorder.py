@@ -136,12 +136,12 @@ class Recorder:
     def begin_content(self):
         self._content_start = time.time()
 
-    def end_content(self, cast_duration=None):
+    def end_content(self, playback_timing=None):
         end = time.time()
         speed = self.recording_fps / self.fps
-        if cast_duration is not None:
-            # Playback ends at the cast's last event. Exclude player startup/import time.
-            self._content_start = end - cast_duration / speed
+        if playback_timing is not None:
+            self._content_start = playback_timing["start"]
+            end = playback_timing["end"]
         self._content_end = end + 0.5 / speed
 
     async def encode(self):

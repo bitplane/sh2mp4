@@ -60,7 +60,7 @@ async def record_command(args) -> int:
                 display.display_name, theme, args.font, args.font_size, args.cols, args.lines, width, height
             )
             async with terminal:
-                await terminal.start(args.command)
+                await terminal.start(args.command, cast_mode=bool(args.cast_file))
                 recorder = Recorder(
                     display.display_name,
                     width,
@@ -88,7 +88,7 @@ async def record_command(args) -> int:
                         if encoder_task in done:
                             await encoder_task
                         exit_code = await command_task
-                        recorder.end_content(getattr(args, "cast_duration", None) if exit_code == 0 else None)
+                        recorder.end_content(terminal.playback_timing() if args.cast_file and exit_code == 0 else None)
                         await asyncio.sleep(0.5 * args.fps / args.recording_fps)
                     finally:
                         for task in (command_task, encoder_task):

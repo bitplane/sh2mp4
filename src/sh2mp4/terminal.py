@@ -4,6 +4,8 @@ Terminal (xterm) management for command execution
 
 import asyncio
 import os
+import sys
+import json
 import shutil
 import shlex
 import tempfile
@@ -40,12 +42,15 @@ class TerminalManager:
         self.temp_dir: Optional[Path] = None
         self.window_id: Optional[str] = None
 
-    async def start(self, command: str) -> None:
+    async def start(self, command: str, cast_mode: bool = False) -> None:
         """Start xterm and execute the command"""
         # Create temporary directory for scripts
         self.temp_dir = Path(tempfile.mkdtemp(prefix="sh2mp4_terminal_"))
 
         # Create command script
+        if cast_mode:
+            renderer = shlex.join([sys.executable, "-m", "sh2mp4.cast_output", str(self.temp_dir / "playback.json")])
+            command = f"{command} --out-fmt asciicast | {renderer}"
         command_script = self._create_command_script(command)
 
         # Start xterm
@@ -66,7 +71,7 @@ class TerminalManager:
 while [ ! -f {shlex.quote(str(sync_file))} ]; do
     sleep 0.01
 done
-bash {shlex.quote(str(payload))}
+bash -o pipefail {shlex.quote(str(payload))}
 status=$?
 # Keep both successful and failed output visible until the recorder stops.
 printf '%s' "$status" > {shlex.quote(str(self.temp_dir / "exit_status"))}
@@ -201,6 +206,9 @@ while :; do sleep 0.1; done
                     return int(status)
             await asyncio.sleep(0.01)
         raise RuntimeError(f"Xterm exited before reporting command status ({self.xterm_process.returncode})")
+
+    def playback_timing(self):
+        return json.loads((self.temp_dir / "playback.json").read_text())
 
     async def is_running(self) -> bool:
         """Check if the terminal is still running"""

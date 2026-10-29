@@ -17,7 +17,13 @@ def run(*args):
 @pytest.mark.parametrize("speed", [None, "2x", "4x", "8x"])
 def test_cast_timing(tmp_path, speed):
     cast = tmp_path / "timing.cast"
-    cast.write_text('{"version":2,"width":80,"height":24}\n[0,"o","start\\r\\n"]\n[3,"o","finish\\r\\n"]\n')
+    events = [
+        {"version": 2, "width": 80, "height": 24},
+        [0, "o", "\x1b[41m\x1b[2J"],
+        [0.6, "o", "\x1b[44m\x1b[2J"],
+        [3, "o", "\x1b[42m\x1b[2J"],
+    ]
+    cast.write_text("\n".join(json.dumps(event) for event in events) + "\n")
     output = tmp_path / "timing.mp4"
     args = ["--cast-file", str(cast), str(output)]
     if speed:
@@ -31,6 +37,31 @@ def test_cast_timing(tmp_path, speed):
         check=True,
     )
     assert float(json.loads(probe.stdout)["format"]["duration"]) == pytest.approx(3.5, abs=0.2)
+    for timestamp, channel in [(0.2, 0), (1.0, 2), (3.2, 1)]:
+        frame = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-ss",
+                str(timestamp),
+                "-i",
+                str(output),
+                "-frames:v",
+                "1",
+                "-vf",
+                "scale=1:1",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "rgb24",
+                "pipe:1",
+            ],
+            capture_output=True,
+            check=True,
+        ).stdout
+        assert len(frame) == 3
+        assert frame[channel] - max(value for index, value in enumerate(frame) if index != channel) > 30
     assert not list(tmp_path.glob(".sh2mp4-*"))
 
 
