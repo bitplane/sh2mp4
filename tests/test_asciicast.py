@@ -18,3 +18,11 @@ def test_cast_filename_is_literal(tmp_path):
     )
     assert result.stdout.splitlines()[-1] == str(cast)
     assert not result.stderr
+
+
+def test_playback_preserves_idle_time_and_overrides_speed_config(tmp_path):
+    import shlex
+
+    args = shlex.split(get_cast_command(tmp_path / "test.cast"))
+    assert args[args.index("-i") + 1] == "inf"
+    assert args[args.index("-s") + 1] == "1.0"

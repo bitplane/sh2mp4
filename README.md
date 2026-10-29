@@ -81,11 +81,15 @@ You can customize or add new themes in the `src/sh2mp4/themes.py` file.
 ## Cast Conversion
 
 The `--speed` option accelerates cast file conversion without affecting the final
-video timing:
+playback timing (idle pauses are preserved):
 
 * ⏩ Asciinema plays the cast file at accelerated speed (`--speed 8x`)
 * 🔥 FFmpeg records at higher frame rate (8x normal fps)
 * 🧙 Video is automatically slowed back down to real-time during encoding
+
+Recording starts after the terminal is configured and the encoder is capturing.
+A short final hold preserves the last screen; its target video duration is 0.5 seconds
+at every conversion speed. Capture and process scheduling can add a small timing overhead.
 
 The cast file is also scanned for the maximum terminal dimensions, to prevent
 text wrapping.

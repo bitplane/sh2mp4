@@ -55,32 +55,24 @@ async def record_command(args) -> int:
         async with DisplayManager(args.display) as display:
             await display.start(width, height)
 
-            # Wait a moment for display to be ready
-            await asyncio.sleep(1)
-
-            # Start recording first (before command execution begins)
-            recorder = Recorder(
-                display.display_name,
-                width,
-                height,
-                args.fps,
-                Path(args.output),
-                watch=args.watch,
-                recording_fps=args.recording_fps,
-                debug=getattr(args, "debug", False),
+            terminal = TerminalManager(
+                display.display_name, theme, args.font, args.font_size, args.cols, args.lines, width, height
             )
-
-            async with recorder:
-                await recorder.start()
-                print("Recording started...")
-
-                # Now start terminal and command
-                terminal = TerminalManager(
-                    display.display_name, theme, args.font, args.font_size, args.cols, args.lines, width, height
+            async with terminal:
+                await terminal.start(args.command)
+                recorder = Recorder(
+                    display.display_name,
+                    width,
+                    height,
+                    args.fps,
+                    Path(args.output),
+                    watch=args.watch,
+                    recording_fps=args.recording_fps,
+                    debug=args.debug,
                 )
-
-                async with terminal:
-                    await terminal.start(args.command)
+                async with recorder:
+                    await recorder.start()
+                    print("Recording started...")
 
                     # Signal that recorder is ready so command can proceed
                     terminal.signal_recorder_ready()
@@ -94,7 +86,7 @@ async def record_command(args) -> int:
                         if encoder_task in done:
                             await encoder_task
                         exit_code = await command_task
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(0.5 * args.fps / args.recording_fps)
                     finally:
                         for task in (command_task, encoder_task):
                             task.cancel()
