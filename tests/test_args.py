@@ -237,3 +237,10 @@ def test_invalid_cast_dimensions(tmp_path, width):
     cast.write_text(json.dumps({"version": 2, "width": width, "height": 24}))
     with pytest.raises(SystemExit):
         parse_and_validate_args(["--cast-file", str(cast)])
+
+
+def test_cast_rejects_extra_output(tmp_path):
+    cast = tmp_path / "test.cast"
+    cast.write_text('{"version":2,"width":80,"height":24}\n')
+    with pytest.raises(SystemExit):
+        parse_and_validate_args(["--cast-file", str(cast), "one.mp4", "two.mp4"])

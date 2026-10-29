@@ -48,7 +48,7 @@ Examples:
 
     # Positional arguments
     parser.add_argument("command", nargs="?", help="Command to record")
-    parser.add_argument("output", nargs="?", default="output.mp4", help="Output MP4 file (default: output.mp4)")
+    parser.add_argument("output", nargs="?", default=None, help="Output MP4 file (default: output.mp4)")
 
     # Cast file mode
     parser.add_argument("--cast-file", help="Convert asciinema cast file to MP4")
@@ -104,6 +104,8 @@ Examples:
             parser.error(f"Cast file '{args.cast_file}' not found")
 
         # In cast file mode, if command is provided, treat it as output filename
+        if args.command is not None and args.output is not None:
+            parser.error("cast-file mode accepts only one output filename")
         if args.command:
             args.output = args.command
 
@@ -142,6 +144,8 @@ Examples:
         # Utility modes
         args.recording_fps = args.fps
 
+    if args.output is None:
+        args.output = "output.mp4"
     size = shutil.get_terminal_size(fallback=(80, 24))
     if args.cols is None:
         args.cols = size.columns
