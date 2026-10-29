@@ -38,9 +38,11 @@ Examples:
             await display._start_xvfb(640, 480)
             if args.font:
                 sizes = [args.size] if args.size else [4, 6, 8, 10, 12, 14, 16, 18, 20]
-                results = {args.font: {size: measure_font(args.font, size, display.display_name) for size in sizes}}
+                results = {
+                    args.font: {size: await measure_font(args.font, size, display.display_name) for size in sizes}
+                }
             else:
-                results = measure_all_fonts(display.display_name)
+                results = await measure_all_fonts(display.display_name)
             for name, sizes in results.items():
                 for size, metrics in sizes.items():
                     if args.size is None or size == args.size:

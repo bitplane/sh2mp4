@@ -28,7 +28,7 @@ async def record_command(args) -> int:
     try:
         async with DisplayManager() as measurement_display:
             await measurement_display._start_xvfb(640, 480)
-            width, height = calculate_window_dimensions(
+            width, height = await calculate_window_dimensions(
                 args.cols, args.lines, args.font, args.font_size, measurement_display.display_name
             )
     except Exception as e:
