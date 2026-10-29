@@ -48,6 +48,7 @@ class Recorder:
         self._capture_path = None
         self._content_start = None
         self._content_end = None
+        self._encoding_started = False
 
     async def start(self) -> None:
         """Start recording the display"""
@@ -149,40 +150,49 @@ class Recorder:
             raise RuntimeError("Recording boundaries were not set")
         speed = self.recording_fps / self.fps
         filters = f"trim=start={self._content_start}:end={self._content_end},setpts={speed}*(PTS-STARTPTS)"
-        process = await asyncio.create_subprocess_exec(
-            "ffmpeg",
-            "-nostdin",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-abort_on",
-            "empty_output",
-            "-copyts",
-            "-i",
-            str(self._capture_path),
-            "-vf",
-            filters,
-            "-r",
-            str(self.fps),
-            "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "18",
-            "-pix_fmt",
-            "yuv420p",
-            str(self.output_path.absolute()),
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
+        self._encoding_started = True
+        fd, path = tempfile.mkstemp(
+            prefix=".sh2mp4-output-", suffix=self.output_path.suffix or ".mp4", dir=self.output_path.absolute().parent
         )
+        os.close(fd)
+        encoded_path = Path(path)
+        process = None
         try:
+            process = await asyncio.create_subprocess_exec(
+                "ffmpeg",
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-abort_on",
+                "empty_output",
+                "-copyts",
+                "-i",
+                str(self._capture_path),
+                "-vf",
+                filters,
+                "-r",
+                str(self.fps),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                str(encoded_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
             _, stderr = await process.communicate()
             if process.returncode:
                 raise RuntimeError(f"FFmpeg encoding failed: {stderr.decode(errors='replace').strip()}")
+            os.replace(encoded_path, self.output_path)
         finally:
             await terminate_process(process)
+            encoded_path.unlink(missing_ok=True)
 
     async def _read_errors(self):
         while chunk := await self.ffmpeg_process.stderr.read(4096):
@@ -301,7 +311,16 @@ class Recorder:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         try:
             if self.ffmpeg_process:
-                await self.stop()
+                save_partial = exc_type is asyncio.CancelledError and not self._encoding_started and self._content_start
+                if save_partial:
+                    self._content_end = time.time()
+                status = await self.stop()
+                if save_partial and status == 0:
+                    try:
+                        await self.encode()
+                        print(f"Partial recording saved: {self.output_path}", file=sys.stderr)
+                    except Exception as error:
+                        print(f"Could not save partial recording: {error}", file=sys.stderr)
         finally:
             if self._capture_path:
                 self._capture_path.unlink(missing_ok=True)

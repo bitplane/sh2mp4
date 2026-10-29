@@ -93,9 +93,14 @@ def test_sigterm_cleans_up_capture(tmp_path):
                 break
         else:
             pytest.fail(process.stderr.read())
+        import time
+
+        time.sleep(0.2)
         process.terminate()
         _, stderr = process.communicate(timeout=15)
         assert process.returncode == 143, stderr
+        assert output.stat().st_size > 0
+        assert "Partial recording saved:" in stderr
         assert not list(tmp_path.glob(".sh2mp4-*"))
     finally:
         if process.poll() is None:
@@ -145,11 +150,14 @@ async def test_empty_trim_is_an_error(tmp_path):
         check=True,
     )
     recorder = Recorder(":99", 32, 32, 30, tmp_path / "empty.mp4")
+    recorder.output_path.write_bytes(b"existing video")
     recorder._capture_path = capture
     recorder._content_start = 1000
     recorder._content_end = 1001
     with pytest.raises(RuntimeError, match="encoding failed"):
         await recorder.encode()
+    assert recorder.output_path.read_bytes() == b"existing video"
+    assert not list(tmp_path.glob(".sh2mp4-output-*"))
 
 
 async def test_private_display_access_control():
