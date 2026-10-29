@@ -3,6 +3,7 @@ Asciinema cast file handling and optimization
 """
 
 import json
+import shlex
 from pathlib import Path
 from typing import NamedTuple
 
@@ -36,7 +37,7 @@ def get_cast_dimensions(cast_file: Path) -> tuple[int, int]:
 def get_cast_command(cast_file: Path, playback_speed: float = 1.0) -> str:
     """Get the command to play back a cast file"""
     speed_arg = f" -s {playback_speed}" if playback_speed != 1.0 else ""
-    return f'bash -c "asciinema play -i 1{speed_arg} \\"{cast_file.absolute()}\\""'
+    return f"asciinema play -i 1{speed_arg} {shlex.quote(str(cast_file.absolute()))}"
 
 
 def get_cast_config(cast_file: Path, playback_speed: float = 1.0, base_fps: int = 30) -> CastConfig:
